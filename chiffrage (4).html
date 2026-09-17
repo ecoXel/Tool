@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chiffrage Docuware</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0f1a;
+    --surface: #111827;
+    --border: #1e2d45;
+    --accent: #4a9eff;
+    --accent-dim: #2d7dd6;
+    --accent-glow: rgba(74, 158, 255, 0.12);
+    --text: #e4edf9;
+    --text-dim: #83a0c4;   /* contraste augmenté (était #4a6080) */
+    --text-mid: #aecaf0;   /* contraste augmenté (était #7a9abf) */
+    --green: #4ade80;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    padding: 32px 20px 60px;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Sélecteur de type, horizontal ── */
+  .type-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .type-btn {
+    flex: 1 1 140px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 14px 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    letter-spacing: 0.06em;
+  }
+  .type-btn:hover { border-color: var(--accent); color: var(--text); }
+  .type-btn.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  .hidden { display: none !important; }
+
+  /* ── Nav haut de page (suivi / chiffrage) ── */
+  .top-bar-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-nav {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-nav:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-nav.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+
+  .btn-primary {
+    background: var(--accent-glow);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary:hover { background: var(--accent); color: var(--bg); }
+
+  /* ── Vue "Suivi des demandes" ── */
+  .file-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .file-status-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .suivi-actions { margin-bottom: 16px; }
+
+  .new-demande-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .new-demande-form input[type="text"],
+  .new-demande-form textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    padding: 8px 10px;
+    outline: none;
+    resize: vertical;
+  }
+  .new-demande-form input[type="text"]:focus,
+  .new-demande-form textarea:focus { border-color: var(--accent); }
+  .new-demande-form-actions { display: flex; gap: 8px; }
+
+  .demandes-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .demandes-table th, .demandes-table td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .demandes-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .demandes-table tbody tr:last-child td { border-bottom: none; }
+  .demandes-table tbody tr:hover { background: var(--accent-glow); }
+  .demande-cell { max-width: 320px; }
+  .demande-actions { display: flex; gap: 6px; white-space: nowrap; }
+  .empty-row { color: var(--text-dim); font-style: italic; text-align: center; }
+
+  /* ── Barre de contexte demande (dans la vue calculateur) ── */
+  .demande-context {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--accent-glow);
+    border: 1px solid var(--accent);
+    padding: 10px 16px;
+    margin-bottom: 16px;
+  }
+  .demande-context-info { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+  .demande-context-client { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .demande-context-req { font-size: 12px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; }
+  .demande-context-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .demande-context-actions select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 8px;
+    outline: none;
+  }
+
+  /* ── Panneau principal ── */
+  .main-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .right-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .right-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .type-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    background: var(--accent-glow);
+    border: 1px solid var(--accent);
+    padding: 2px 8px;
+    display: none;
+  }
+
+  .right-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .btn-action {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-action:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-action.copied { border-color: var(--green); color: var(--green); }
+  .btn-action.active-toggle { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+
+  /* ── Tableau chiffrage ── */
+  .chiffrage-table { padding: 4px 20px 0; }
+
+  .tbl-row {
+    display: grid;
+    grid-template-columns: 1fr 72px 16px;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tbl-row:last-child { border-bottom: none; }
+  .tbl-row-detail { padding-top: 4px; }
+  .tbl-row-detail > div { grid-column: 1; }
+  .tbl-row-attached { border-bottom: none; padding-bottom: 4px; }
+
+  .tbl-name { font-size: 13px; color: var(--text); font-weight: 500; }
+  .tbl-name .tbl-option-tag { font-size: 10px; color: var(--text-dim); font-weight: 400; }
+  .tbl-desc { font-size: 12px; color: var(--text-dim); margin-top: 3px; font-style: italic; line-height: 1.5; }
+
+  .tbl-qty-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 5px;
+    font-size: 12px;
+    font-style: normal;
+    color: var(--text-mid);
+  }
+  .qty-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    width: 46px;
+    padding: 4px 5px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .qty-input:focus { border-color: var(--accent); }
+  .qty-hint { color: var(--text-dim); font-style: italic; }
+
+  input[type="number"].tbl-input-root {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    width: 72px;
+    padding: 5px 8px;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="number"].tbl-input-root:focus { border-color: var(--accent); }
+
+  .tbl-value {
+    display: block;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    width: 72px;
+    padding: 5px 8px;
+    text-align: right;
+  }
+  .tbl-value.zero { color: var(--text-dim); }
+  .tbl-value.na { color: var(--text-dim); text-align: center; background: transparent; border-color: transparent; }
+
+  .tbl-unit { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-dim); }
+
+  /* ── Colonnes Forfait / TMA (type "Projet" uniquement) ── */
+  .tbl-row-split { grid-template-columns: 1fr 64px 14px 64px 14px; }
+  .tbl-row-header { padding: 4px 0 8px; border-bottom: 2px solid var(--accent-dim); }
+  .col-head { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-mid); letter-spacing: 0.08em; text-transform: uppercase; text-align: right; width: 64px; }
+  .col-head:nth-of-type(2) { grid-column: 2; }
+  .col-head:nth-of-type(3) { grid-column: 4; }
+  .col-head .tma-star { color: var(--accent); }
+  .tma-footnote { padding: 6px 20px 2px; font-size: 10px; color: var(--text-dim); font-style: italic; }
+  .tbl-row-split input[type="number"].tbl-input-root,
+  .tbl-row-split .tbl-value { width: 64px; }
+  .tma-note { font-size: 11px; color: var(--text-dim); font-style: italic; margin-top: 6px; }
+  .gate-hint { padding: 16px 0 4px; font-size: 12px; color: var(--text-mid); font-style: italic; text-align: center; }
+
+  .tbl-row-coltotal { border-top: 2px solid var(--accent-dim); border-bottom: none; }
+  .tbl-row-coltotal .tbl-value { font-weight: 700; white-space: nowrap; }
+  .tbl-row-split .tbl-unit { visibility: hidden; }
+  .qty-line-nowrap { flex-wrap: nowrap; }
+  .tbl-unit-hide { visibility: hidden; }
+  .total-row-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-mid);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .detail-textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    padding: 8px 10px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .detail-textarea:focus { border-color: var(--accent); }
+  .detail-textarea::placeholder { color: var(--text-dim); }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-top: 2px solid var(--accent-dim);
+    margin-top: 4px;
+  }
+  .total-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-mid);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .total-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .total-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  /* ── Mail preview (masqué par défaut) ── */
+  .mail-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0 20px;
+  }
+  .mail-preview { padding: 20px; }
+  .mail-preview-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  #mail-render {
+    background: #fff;
+    color: #222;
+    padding: 20px 24px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.7;
+    border: 1px solid #ddd;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* ── Rappel, relégué en pied de page ── */
+  footer.rappel-footer {
+    max-width: 900px;
+    margin: 24px auto 0;
+  }
+  footer.rappel-footer details {
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  footer.rappel-footer summary {
+    cursor: pointer;
+    padding: 10px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    list-style: none;
+  }
+  footer.rappel-footer summary::-webkit-details-marker { display: none; }
+  footer.rappel-footer summary::before { content: '▸ '; }
+  footer.rappel-footer details[open] summary::before { content: '▾ '; }
+  footer.rappel-footer .rappel-body { padding: 0 16px 14px; border-top: 1px solid var(--border); }
+  footer.rappel-footer .rappel-body p { font-size: 11px; color: var(--text-dim); line-height: 1.7; margin-top: 8px; }
+  footer.rappel-footer .rappel-body p strong { color: var(--text-mid); }
+
+  @media (max-width: 500px) {
+    .type-btn { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="top-bar">
+    <h1>// Chiffrage Docuware</h1>
+    <div class="top-bar-actions">
+      <button class="btn-nav" id="nav-suivi" onclick="showView('suivi')">📋 Suivi des demandes</button>
+      <button class="btn-reset" onclick="resetAll(); showView('chiffrage');">↺ Nouveau chiffrage</button>
+    </div>
+  </div>
+
+  <div id="view-suivi" class="hidden">
+    <div class="file-status-bar">
+      <span id="file-status-text">—</span>
+      <div class="file-status-actions">
+        <button class="btn-action" id="btn-connect-file" onclick="connectFile()">Choisir le fichier CSV…</button>
+        <button class="btn-action hidden" id="btn-reconnect-file" onclick="reconnectFile()">🔓 Reconnecter</button>
+        <button class="btn-action hidden" id="btn-reload-file" onclick="loadFromFileHandle()">📂 Charger depuis le fichier</button>
+        <button class="btn-action hidden" id="btn-save-file" onclick="saveDemandes()">💾 Enregistrer dans le fichier</button>
+        <button class="btn-action hidden" id="btn-import-fallback" onclick="document.getElementById('csv-import-input').click()">Importer CSV…</button>
+        <button class="btn-action hidden" id="btn-export-fallback" onclick="downloadCsv()">⬇ Télécharger CSV</button>
+        <input type="file" id="csv-import-input" accept=".csv" class="hidden" onchange="handleCsvImport(event)">
+      </div>
+    </div>
+
+    <div class="suivi-actions">
+      <button class="btn-primary" onclick="openNewDemandeForm()">+ Nouvelle demande</button>
+    </div>
+
+    <div id="new-demande-form" class="new-demande-form hidden">
+      <input type="text" id="nd-client" placeholder="Client">
+      <textarea id="nd-demande" rows="2" placeholder="Demande initiale du client"></textarea>
+      <div class="new-demande-form-actions">
+        <button class="btn-primary" onclick="createDemande()">Créer et chiffrer</button>
+        <button class="btn-action" onclick="cancelNewDemandeForm()">Annuler</button>
+      </div>
+    </div>
+
+    <table class="demandes-table">
+      <thead>
+        <tr><th>Client</th><th>Demande</th><th>Statut</th><th>Total</th><th>Dernière maj</th><th></th></tr>
+      </thead>
+      <tbody id="demandes-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="view-chiffrage">
+
+  <div id="demande-context" class="demande-context hidden">
+    <div class="demande-context-info">
+      <span class="demande-context-client" id="ctx-client"></span>
+      <span class="demande-context-req" id="ctx-demande"></span>
+    </div>
+    <div class="demande-context-actions">
+      <select id="ctx-statut" onchange="onStatutChange()"></select>
+      <button class="btn-action" onclick="manualSave()">💾 Enregistrer</button>
+      <button class="btn-action" onclick="backToSuivi()">◀ Retour au suivi</button>
+    </div>
+  </div>
+
+  <div class="type-bar">
+    <button class="type-btn" data-type="preconf" onclick="setType('preconf', this)">Préconf</button>
+    <button class="type-btn" data-type="normal" onclick="setType('normal', this)">Projet</button>
+  </div>
+
+  <div class="main-panel">
+
+    <div class="right-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="right-title">Résultat</span>
+        <span class="type-badge" id="type-badge"></span>
+      </div>
+      <div class="right-actions" id="right-actions" style="display:none">
+        <button class="btn-action" id="btn-mail-toggle" onclick="toggleMail()">Afficher l'aperçu mail</button>
+        <button class="btn-action" id="btn-copy" onclick="copyMail()">Copier mail</button>
+      </div>
+    </div>
+
+    <div id="empty-state" class="empty-state">
+      Sélectionne un type de projet : le tableau s'affiche direct et se met à jour à chaque ajustement.
+    </div>
+
+    <div id="chiffrage-wrap" class="hidden">
+      <div class="chiffrage-table" id="chiffrage-body"></div>
+
+      <div class="total-row" id="total-block-single">
+        <div class="total-labels">
+          <div class="total-label">Total</div>
+          <div class="total-sub" id="total-sub"></div>
+        </div>
+        <div class="total-value" id="total-display">—</div>
+      </div>
+
+      <div class="total-row hidden" id="total-block-split">
+        <div class="total-labels">
+          <div class="total-label">Total</div>
+          <div class="total-sub" id="total-sub-split"></div>
+        </div>
+        <div class="total-value" id="total-display-grand">—</div>
+      </div>
+
+      <div id="mail-block" class="hidden">
+        <hr class="mail-divider">
+        <div class="mail-preview">
+          <div class="mail-preview-label">Aperçu mail : copiable dans Outlook</div>
+          <div id="mail-render"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="rappel-footer">
+    <details id="rappel-normal" class="hidden">
+      <summary>Rappel calcul : Projet normal</summary>
+      <div class="rappel-body">
+        <p><strong>Gestion de projet (20%)</strong> : 1 kick-off, 30 min de coproj/semaine, 1 copil/mois</p>
+        <p><strong>Spec (30%)</strong> : X ateliers de 2h + 1 atelier de validation inclus</p>
+        <p><strong>Base de calcul</strong> : paramétrage seul (installation et développement autonomes, n'entrent pas dans le calcul des autres lignes)</p>
+        <p><strong>Recette (30%)</strong> : présentation Key Users incluse ; 75% forfait / 25% TMA, avec un minimum de 1 j en forfait dès que la recette dépasse 1 j</p>
+        <p><strong>MEP</strong> : 0,5j par env hors prod (0 uniquement en production)</p>
+        <p><strong>Doc (10%)</strong> : DEX, DAT, passation support</p>
+        <p><strong>VSR (10%)</strong> : accompagnement et correction post-livraison</p>
+        <p><strong>Petit paramétrage (≤ 3 j)</strong> : forfait plancher au lieu du calcul en % — Gestion de projet 0,5 j, Spécification 0 j, Recette et ajustement 0,5 j, Documentation 0 j (incluse dans la MEP), VSR 0 j</p>
+      </div>
+    </details>
+    <details id="rappel-preconf" class="hidden">
+      <summary>Rappel calcul : Préconfiguré</summary>
+      <div class="rappel-body">
+        <p><strong>Gestion de projet</strong> : 1 j</p>
+        <p><strong>Atelier spécifications</strong> : 0,5 j (atelier de 2h)</p>
+        <p><strong>Paramétrage</strong> : 3,5 j (environnement cloud, installation préconfigurée, configuration, DEX)</p>
+        <p><strong>Recette</strong> : 1 j</p>
+        <p><strong>Connecteur</strong> : 0,5 j/unité (optionnel)</p>
+        <p><strong>Formation</strong> : 0,5 j/session (optionnel)</p>
+      </div>
+    </details>
+  </footer>
+
+  </div>
+
+</div>
+
+<script>
+  // ── État global ─────────────────────────────────────────
+  let currentType = null;
+  let atelierTouched = false;
+  let paramRevealed = false; // true une fois le paramétrage rempli -> tableau complet affiché
+  let manualTouched = new Set(); // ids des cases calculées que l'utilisateur a modifiées à la main
+
+  // ── Suivi des demandes de chiffrage ──────────────────────
+  const STATUTS = ['Demande', 'Attente', 'En cours', 'Dev', 'Transmis', 'Révision', 'Validé', 'Refus', 'Abandonné'];
+  let demandes = []; // liste travaillée en local (localStorage) : { id, client, demande, statut, date_creation, date_maj, type, total_forfait, total_tma, etat_json, mail_html }
+  let currentDemandeId = null; // demande actuellement ouverte dans le calculateur, ou null en mode "chiffrage libre"
+  let fileHandle = null; // FileSystemFileHandle du CSV connecté (navigateurs compatibles uniquement)
+  const fileApiSupported = typeof window.showOpenFilePicker === 'function';
+
+  // Sélectionne tout le contenu d'une case numérique quand on clique/tab dedans,
+  // pour que taper "10" remplace le "0" existant au lieu de s'ajouter à côté (-> "010"/"100").
+  let suppressAutoSelect = false; // désactivé le temps de restaurer le curseur après un revealFull()
+  document.addEventListener('focusin', function (e) {
+    if (suppressAutoSelect) return;
+    if (e.target.matches && e.target.matches('input[type="number"]')) {
+      e.target.select();
+    }
+  });
+
+  function roundUp(v) { return Math.ceil(v * 2) / 2; }
+  function fmt(v) {
+    if (v === 0) return '0 j';
+    return v % 1 === 0 ? v + ' j' : String(v).replace('.', ',') + ' j';
+  }
+  function fmtNum(v) {
+    if (v === 0) return '0';
+    return v % 1 === 0 ? String(v) : String(v).replace('.', ',');
+  }
+  function fmtJour(v) {
+    return fmtNum(v) + ' jour' + (v > 1 ? 's' : '');
+  }
+  function val(id) { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; }
+  function ival(id) { const el = document.getElementById(id); return el ? (parseInt(el.value) || 0) : 0; }
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Reset complet ─────────────────────────────────────────
+  // resetCalculatorUI() remet juste l'écran calculateur à zéro (utilisé aussi bien par le
+  // bouton "Nouveau chiffrage" que par l'ouverture d'une demande, qui elle garde son contexte).
+  function resetCalculatorUI() {
+    currentType = null;
+    atelierTouched = false;
+    paramRevealed = false;
+    manualTouched = new Set();
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('chiffrage-wrap').classList.add('hidden');
+    document.getElementById('empty-state').classList.remove('hidden');
+    document.getElementById('right-actions').style.display = 'none';
+    document.getElementById('type-badge').style.display = 'none';
+    document.querySelectorAll('footer.rappel-footer details').forEach(d => { d.classList.add('hidden'); d.open = false; });
+    document.getElementById('mail-block').classList.add('hidden');
+    document.getElementById('btn-mail-toggle').textContent = "Afficher l'aperçu mail";
+    document.getElementById('btn-mail-toggle').classList.remove('active-toggle');
+    document.getElementById('chiffrage-body').innerHTML = '';
+    document.getElementById('total-block-single').classList.remove('hidden');
+    document.getElementById('total-block-split').classList.add('hidden');
+  }
+
+  function resetAll() {
+    // "Nouveau chiffrage" depuis la barre du haut : on quitte toute demande en cours.
+    currentDemandeId = null;
+    hideDemandeContextBar();
+    resetCalculatorUI();
+  }
+
+  // ── Capture/réapplique les valeurs du paramétrage à la bascule gate -> tableau complet ──
+  function captureParamValues() {
+    const ids = ['in-install', 'in-dev', 'in-config', 'in-install-tma', 'in-dev-tma', 'in-config-tma', 'in-detail'];
+    const vals = {};
+    ids.forEach(id => { const el = document.getElementById(id); if (el) vals[id] = el.value; });
+    return vals;
+  }
+  function applyParamValues(vals) {
+    Object.keys(vals).forEach(id => { const el = document.getElementById(id); if (el) el.value = vals[id]; });
+  }
+
+  // ── Choix du type ────────────────────────────────────────
+  // "Chrome" commune (badges, rappel, visibilité des blocs) factorisée pour pouvoir
+  // être rejouée depuis setType() (clic utilisateur) OU depuis la restauration d'une
+  // demande sauvegardée (loadDemandeIntoCalculatorState), sans dupliquer la logique.
+  function applyTypeChrome(type) {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+
+    document.querySelectorAll('footer.rappel-footer details').forEach(d => { d.classList.add('hidden'); d.open = false; });
+    document.getElementById('rappel-' + type).classList.remove('hidden');
+
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('chiffrage-wrap').classList.remove('hidden');
+    document.getElementById('mail-block').classList.add('hidden');
+    document.getElementById('btn-mail-toggle').textContent = "Afficher l'aperçu mail";
+    document.getElementById('btn-mail-toggle').classList.remove('active-toggle');
+
+    const labels = { preconf: 'Préconfiguré', normal: 'Projet normal' };
+    const badge = document.getElementById('type-badge');
+    badge.style.display = 'inline-block';
+    badge.textContent = labels[type];
+
+    document.getElementById('total-block-single').classList.toggle('hidden', type === 'normal');
+    document.getElementById('total-block-split').classList.toggle('hidden', type !== 'normal');
+  }
+
+  function renderTypeBody(type) {
+    if (TEMPLATES[type].gate) {
+      // type "Projet" : on ne montre que le paramétrage tant qu'il n'est pas rempli
+      document.getElementById('right-actions').style.display = 'none';
+      document.getElementById('total-block-single').classList.add('hidden');
+      document.getElementById('total-block-split').classList.add('hidden');
+      document.getElementById('chiffrage-body').innerHTML = TEMPLATES[type].gate();
+    } else {
+      // type "Préconf" : pas de paramétrage de base, tableau complet direct
+      paramRevealed = true;
+      document.getElementById('right-actions').style.display = 'flex';
+      document.getElementById('chiffrage-body').innerHTML = TEMPLATES[type].full();
+    }
+  }
+
+  function setType(type, btn) {
+    currentType = type;
+    atelierTouched = false;
+    paramRevealed = false;
+    manualTouched = new Set();
+    applyTypeChrome(type);
+    renderTypeBody(type);
+    update();
+  }
+
+  // ── Bascule le gate paramétrage vers le tableau complet ────
+  function revealFull() {
+    const saved = captureParamValues();
+    // On mémorise le champ actif et la position du curseur : le tableau complet remplace
+    // tout le HTML (nouveaux éléments), donc le focus serait perdu sans ça au 1er chiffre tapé.
+    const active = document.activeElement;
+    const activeId = (active && saved.hasOwnProperty(active.id)) ? active.id : null;
+    const selStart = activeId && typeof active.selectionStart === 'number' ? active.selectionStart : null;
+    const selEnd = activeId && typeof active.selectionEnd === 'number' ? active.selectionEnd : null;
+
+    paramRevealed = true;
+    document.getElementById('chiffrage-body').innerHTML = TEMPLATES[currentType].full();
+    applyParamValues(saved);
+    document.getElementById('right-actions').style.display = 'flex';
+    document.getElementById('total-block-single').classList.toggle('hidden', currentType === 'normal');
+    document.getElementById('total-block-split').classList.toggle('hidden', currentType !== 'normal');
+
+    if (activeId) {
+      const el = document.getElementById(activeId);
+      if (el) {
+        suppressAutoSelect = true;
+        el.focus();
+        if (selStart !== null) {
+          // setSelectionRange est refusé sur input[type=number] : bascule temporaire en text.
+          const originalType = el.type;
+          try {
+            el.type = 'text';
+            el.setSelectionRange(selStart, selEnd);
+          } catch (e) { /* tant pis, le focus reste au bon endroit */ }
+          el.type = originalType;
+        }
+        suppressAutoSelect = false;
+      }
+    }
+  }
+
+  // ── Aperçu mail à la demande ───────────────────────────────
+  function toggleMail() {
+    const block = document.getElementById('mail-block');
+    const btn = document.getElementById('btn-mail-toggle');
+    const showing = !block.classList.contains('hidden');
+    if (showing) {
+      block.classList.add('hidden');
+      btn.textContent = "Afficher l'aperçu mail";
+      btn.classList.remove('active-toggle');
+    } else {
+      block.classList.remove('hidden');
+      btn.textContent = "Masquer l'aperçu mail";
+      btn.classList.add('active-toggle');
+    }
+  }
+
+  // ── Bloc "paramétrage" pour le gate du type Projet (Forfait/TMA) ──
+  // Une seule ligne (Paramétrage) suffit pour débloquer le tableau ; Installation et
+  // Développement restent disponibles pour ajustement une fois le tableau complet affiché.
+  const PARAM_GATE_SPLIT = `
+    <div class="tbl-row tbl-row-split tbl-row-header">
+      <div></div>
+      <div class="col-head">Forfait</div>
+      <div class="col-head">TMA<span class="tma-star">*</span></div>
+    </div>
+    <div class="tbl-row tbl-row-split tbl-row-attached">
+      <div><div class="tbl-name">Paramétrage</div></div>
+      <input type="number" class="tbl-input-root" id="in-config" value="0" min="0" step="0.5" oninput="update()">
+      <span class="tbl-unit">j</span>
+      <input type="number" class="tbl-input-root" id="in-config-tma" value="0" min="0" step="0.5" oninput="update()">
+      <span class="tbl-unit">j</span>
+    </div>
+    <div class="tbl-row tbl-row-split tbl-row-detail">
+      <div>
+        <textarea class="detail-textarea" id="in-detail" rows="2" placeholder="Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)" oninput="update()"></textarea>
+      </div>
+    </div>
+  `;
+
+  // ── Templates HTML par type ────────────────────────────────
+  const TEMPLATES = {
+
+    normal: { gate: () => PARAM_GATE_SPLIT + `<div class="gate-hint">Renseigne le paramétrage : le reste du chiffrage s'affiche automatiquement.</div>`, full: () => `
+      <div class="tbl-row tbl-row-split tbl-row-header">
+        <div></div>
+        <div class="col-head">Forfait</div>
+        <div class="col-head">TMA<span class="tma-star">*</span></div>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div>
+          <div class="tbl-name">Gestion de projet</div>
+          <div class="tbl-desc"><strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> toute comitologie client (coproj, copil, etc.)</div>
+        </div>
+        <input type="number" class="tbl-input-root" id="v-gestion-f" value="0" min="0" step="0.5" oninput="markTouched('v-gestion-f'); update();">
+        <span class="tbl-unit">j</span>
+        <input type="number" class="tbl-input-root" id="v-gestion-t" value="0" min="0" step="0.5" oninput="markTouched('v-gestion-t'); update();">
+        <span class="tbl-unit">j</span>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div>
+          <div class="tbl-name">Spécification et ateliers</div>
+          <div class="tbl-desc" id="d-spec"></div>
+          <div class="tbl-desc"><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé</div>
+        </div>
+        <input type="number" class="tbl-input-root" id="v-spec-f" value="0" min="0" step="0.5" oninput="markTouched('v-spec-f'); update();">
+        <span class="tbl-unit">j</span>
+        <span class="tbl-value na" id="v-spec-t">—</span><span class="tbl-unit"></span>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div><div class="tbl-name">Installation</div></div>
+        <input type="number" class="tbl-input-root" id="in-install" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+        <input type="number" class="tbl-input-root" id="in-install-tma" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+      </div>
+      <div class="tbl-row tbl-row-split">
+        <div><div class="tbl-name">Développement</div></div>
+        <input type="number" class="tbl-input-root" id="in-dev" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+        <input type="number" class="tbl-input-root" id="in-dev-tma" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+      </div>
+      <div class="tbl-row tbl-row-split tbl-row-attached">
+        <div><div class="tbl-name">Paramétrage</div></div>
+        <input type="number" class="tbl-input-root" id="in-config" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+        <input type="number" class="tbl-input-root" id="in-config-tma" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+      </div>
+      <div class="tbl-row tbl-row-split tbl-row-detail">
+        <div>
+          <textarea class="detail-textarea" id="in-detail" rows="2" placeholder="Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)" oninput="update()"></textarea>
+        </div>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div>
+          <div class="tbl-name">Recette et ajustement</div>
+          <div class="tbl-desc"><strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement</div>
+        </div>
+        <input type="number" class="tbl-input-root" id="v-recette-f" value="0" min="0" step="0.5" oninput="markTouched('v-recette-f'); update();">
+        <span class="tbl-unit">j</span>
+        <input type="number" class="tbl-input-root" id="v-recette-t" value="0" min="0" step="0.5" oninput="markTouched('v-recette-t'); update();">
+        <span class="tbl-unit">j</span>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div>
+          <div class="tbl-name">Mise en production</div>
+          <div class="tbl-desc" id="d-mep"></div>
+        </div>
+        <input type="number" class="tbl-input-root" id="v-mep-f" value="0" min="0" step="0.5" oninput="markTouched('v-mep-f'); update();">
+        <span class="tbl-unit">j</span>
+        <span class="tbl-value na" id="v-mep-t">—</span><span class="tbl-unit"></span>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div>
+          <div class="tbl-name">Documentation</div>
+          <div class="tbl-desc">DEX, DAT, passation support</div>
+        </div>
+        <input type="number" class="tbl-input-root" id="v-doc-f" value="0" min="0" step="0.5" oninput="markTouched('v-doc-f'); update();">
+        <span class="tbl-unit">j</span>
+        <span class="tbl-value na" id="v-doc-t">—</span><span class="tbl-unit"></span>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div>
+          <div class="tbl-name">VSR</div>
+          <div class="tbl-desc">accompagnement et correction post-livraison</div>
+        </div>
+        <span class="tbl-value na" id="v-vsr-f">—</span><span class="tbl-unit"></span>
+        <input type="number" class="tbl-input-root" id="v-vsr-t" value="0" min="0" step="0.5" oninput="markTouched('v-vsr-t'); update();">
+        <span class="tbl-unit">j</span>
+      </div>
+
+      <div class="tbl-row tbl-row-split tbl-row-attached">
+        <div><div class="tbl-name">Connecteurs</div></div>
+        <input type="number" class="tbl-input-root" id="in-connecteurs-f" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+        <input type="number" class="tbl-input-root" id="in-connecteurs-t" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+      </div>
+      <div class="tbl-row tbl-row-split tbl-row-detail">
+        <div>
+          <textarea class="detail-textarea" id="in-connecteurs-detail" rows="2" placeholder="Précise les connecteurs concernés (ex : CRM, ERP...)" oninput="update()"></textarea>
+        </div>
+      </div>
+
+      <div class="tbl-row tbl-row-split">
+        <div>
+          <div class="tbl-name">Formation</div>
+          <div class="tbl-desc" id="d-formation"></div>
+        </div>
+        <span class="tbl-value na" id="v-formation-f">—</span><span class="tbl-unit"></span>
+        <input type="number" class="tbl-input-root" id="v-formation-t" value="0" min="0" step="0.5" oninput="markTouched('v-formation-t'); update();">
+        <span class="tbl-unit">j</span>
+      </div>
+
+      <div class="tbl-row tbl-row-split tbl-row-coltotal">
+        <div class="total-row-label">Total</div>
+        <span class="tbl-value" id="v-total-forfait-col">—</span><span class="tbl-unit">j</span>
+        <span class="tbl-value" id="v-total-tma-col">—</span><span class="tbl-unit">j</span>
+      </div>
+
+    ` },
+
+    preconf: { gate: null, full: () => `
+      <div class="tbl-row">
+        <div>
+          <div class="tbl-name">Gestion de projet</div>
+          <div class="tbl-desc">1 kick-off et suivi</div>
+        </div>
+        <span class="tbl-value" id="v-gestion-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+      </div>
+
+      <div class="tbl-row">
+        <div>
+          <div class="tbl-name">Atelier spécifications</div>
+          <div class="tbl-desc">cadrage du besoin client ; atelier de 2h</div>
+        </div>
+        <span class="tbl-value" id="v-atelier-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+      </div>
+
+      <div class="tbl-row">
+        <div>
+          <div class="tbl-name">Paramétrage</div>
+          <div class="tbl-desc">Environnement cloud, installation préconfigurée, configuration, DEX.</div>
+        </div>
+        <span class="tbl-value" id="v-param-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+      </div>
+
+      <div class="tbl-row">
+        <div>
+          <div class="tbl-name">Recette</div>
+          <div class="tbl-desc">validation et ajustements client</div>
+        </div>
+        <span class="tbl-value" id="v-recette-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+      </div>
+
+      <div class="tbl-row">
+        <div>
+          <div class="tbl-name" id="n-connecteurs-pc">Connecteurs</div>
+          <div class="tbl-desc" id="d-connecteurs-pc"></div>
+        </div>
+        <span class="tbl-value" id="v-connecteurs-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+      </div>
+
+      <div class="tbl-row">
+        <div>
+          <div class="tbl-name">VSR</div>
+          <div class="tbl-desc">non inclus</div>
+        </div>
+        <span class="tbl-value zero" id="v-vsr-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+      </div>
+
+      <div class="tbl-row">
+        <div>
+          <div class="tbl-name">Formation <span class="tbl-option-tag">(option)</span></div>
+          <div class="tbl-desc" id="d-formation-pc"></div>
+        </div>
+        <span class="tbl-value" id="v-formation-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+      </div>
+    ` }
+  };
+
+  function qtyLine(hint, id, v, min, max, step, onchange, extraClass) {
+    return `<div class="tbl-qty-line${extraClass ? ' ' + extraClass : ''}">
+      <input type="number" class="qty-input" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}" oninput="${onchange}">
+      <span class="qty-hint">${hint}</span>
+    </div>`;
+  }
+
+  function setValue(id, v) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = fmtNum(v);
+    el.classList.toggle('zero', v === 0);
+  }
+
+  // valeur numérique réelle (peut être 0), affichée normalement
+  function setNumValue(id, v) { setValue(id, v); }
+  // colonne non pertinente pour cette ligne (ex: TMA sur une ligne 100% forfait) -> tiret
+  function setNA(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = '—';
+  }
+
+  // case calculée mais modifiable à la main : pose la valeur calculée par défaut,
+  // sauf si l'utilisateur l'a déjà modifiée (elle reste alors telle quelle).
+  function setComputed(id, v) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!manualTouched.has(id)) el.value = v;
+  }
+  // marque une case comme modifiée à la main : elle ne sera plus écrasée par le calcul.
+  function markTouched(id) {
+    manualTouched.add(id);
+  }
+
+  function defaultAteliers(p) {
+    return Math.max(1, Math.round((roundUp(p * 0.30) - 0.5) / 0.5));
+  }
+
+  // Base de calcul des lignes en % (gestion, spec, recette, doc, vsr) : paramétrage seul.
+  // Installation et Développement sont autonomes, ils n'entrent plus dans cette base
+  // (sinon ils font bouger tout le reste).
+  function paramSum() {
+    return val('in-config');
+  }
+  // Pour savoir si le gate doit se déclencher : n'importe quel champ rempli, installation incluse.
+  function hasAnyParam() {
+    return val('in-install') + val('in-dev') + val('in-config') > 0;
+  }
+  function paramDetail() {
+    const el = document.getElementById('in-detail');
+    return el ? el.value.trim() : '';
+  }
+
+  function update() {
+    if (!currentType) return;
+
+    if (!paramRevealed) {
+      if (hasAnyParam()) revealFull();
+      else return; // rien à calculer tant que le paramétrage n'est pas rempli
+    }
+
+    if (currentType === 'normal') updateNormal();
+    else if (currentType === 'preconf') updatePreconf();
+  }
+
+  // ── Type "normal" (Forfait / TMA) ─────────────────────────
+  function updateNormal() {
+    const p = paramSum(); // base = paramétrage seul (installation et développement autonomes, exclus)
+
+    const dSpec = document.getElementById('d-spec');
+    if (!dSpec.querySelector('#in-ateliers')) {
+      dSpec.innerHTML = qtyLine('atelier(s) de 2h + 1 atelier de validation inclus', 'in-ateliers', defaultAteliers(p), 1, 20, 1, 'onAteliersChange()');
+    } else if (!atelierTouched) {
+      document.getElementById('in-ateliers').value = defaultAteliers(p);
+    }
+    const nbAteliers = ival('in-ateliers');
+    const specDays = roundUp(0.5 * (nbAteliers + 1));
+
+    const dMep = document.getElementById('d-mep');
+    if (!dMep.querySelector('#in-env')) {
+      dMep.innerHTML = qtyLine('environnement(s) hors prod ; 0 uniquement en production, MEP non incluse', 'in-env', 1, 0, 10, 1, 'updateNormal()');
+    }
+    const nbEnv = ival('in-env');
+    const mepDays = nbEnv * 0.5;
+
+    const connForfait = val('in-connecteurs-f');
+    const connTMA = val('in-connecteurs-t');
+    const connDetailEl = document.getElementById('in-connecteurs-detail');
+    const connDetail = connDetailEl ? connDetailEl.value.trim() : '';
+
+    const dForm = document.getElementById('d-formation');
+    if (!dForm.querySelector('#in-sessions')) {
+      dForm.innerHTML = qtyLine('session(s) (une session équivaut à 3h, max 8 participants, facturée 0,5 j par session)', 'in-sessions', 0, 0, 20, 1, 'updateNormal()', 'qty-line-nowrap');
+    }
+    const nbSess = ival('in-sessions');
+    const formDays = nbSess * 0.5;
+
+    // Petit paramétrage (≤ 3j) : forfait plancher au lieu du calcul en %, pour les tout petits projets
+    // (remplace l'ancien type "Petit projet", fusionné ici).
+    const isSmallParam = p <= 3;
+
+    // Gestion de projet : total ~20% du paramétrage, ~50/50 forfait/TMA (forfait arrondi 0,5 sup., TMA = reste)
+    const gestionTotal = isSmallParam ? 0.5 : roundUp(p * 0.20);
+    const gestionForfait = roundUp(gestionTotal * 0.5);
+    const gestionTMA = gestionTotal - gestionForfait;
+
+    // Spécification : tout en forfait, TMA = note descriptive (0,5j/atelier sup., pas une valeur chiffrée)
+    const specForfait = isSmallParam ? 0 : specDays;
+
+    // Installation / Développement / Paramétrage : forfait = saisi, TMA = saisie manuelle
+    const installF = val('in-install'), installT = val('in-install-tma');
+    const devF = val('in-dev'), devT = val('in-dev-tma');
+    const configF = val('in-config'), configT = val('in-config-tma');
+
+    // Recette : 75% forfait / 25% TMA, mini 1j forfait dès que le total dépasse 1j, sinon tout en forfait
+    const recetteTotal = isSmallParam ? 0.5 : roundUp(p * 0.30);
+    let recetteForfait, recetteTMA;
+    if (recetteTotal <= 1) { recetteForfait = recetteTotal; recetteTMA = 0; }
+    else {
+      recetteForfait = Math.min(recetteTotal, Math.max(1, roundUp(recetteTotal * 0.75)));
+      recetteTMA = recetteTotal - recetteForfait;
+    }
+
+    // Documentation : pour un petit paramétrage, elle est incluse dans la MEP (comme dans l'ancien "Petit projet")
+    const docDays = isSmallParam ? 0 : roundUp(p * 0.10);
+    const vsrDays = isSmallParam ? 0 : roundUp(p * 0.10);
+
+    // Ces cases sont éditables à la main : on pose la valeur calculée par défaut, sauf si
+    // l'utilisateur l'a déjà modifiée (setComputed), puis on relit la valeur réellement
+    // affichée (calculée ou modifiée) pour les totaux et le mail.
+    setComputed('v-gestion-f', gestionForfait);
+    setComputed('v-gestion-t', gestionTMA);
+    setComputed('v-spec-f', specForfait);
+    setComputed('v-recette-f', recetteForfait);
+    setComputed('v-recette-t', recetteTMA);
+    setComputed('v-mep-f', mepDays);
+    setComputed('v-doc-f', docDays);
+    setComputed('v-vsr-t', vsrDays);
+    setComputed('v-formation-t', formDays);
+
+    const gestionForfaitFinal = val('v-gestion-f');
+    const gestionTMAFinal = val('v-gestion-t');
+    const specForfaitFinal = val('v-spec-f');
+    const recetteForfaitFinal = val('v-recette-f');
+    const recetteTMAFinal = val('v-recette-t');
+    const mepDaysFinal = val('v-mep-f');
+    const docDaysFinal = val('v-doc-f');
+    const vsrDaysFinal = val('v-vsr-t');
+    const formDaysFinal = val('v-formation-t');
+
+    const items = [
+      { label: 'Gestion de projet', desc: '<strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> toute comitologie client (coproj, copil, etc.)', forfait: gestionForfaitFinal, tma: gestionTMAFinal },
+      { label: 'Spécification et ateliers', desc: '<strong>Forfait :</strong> ' + nbAteliers + ' atelier' + (nbAteliers > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé', forfait: specForfaitFinal, tma: 0 },
+      { label: 'Installation', desc: '', forfait: installF, tma: installT },
+      { label: 'Développement', desc: '', forfait: devF, tma: devT },
+      { label: 'Paramétrage', desc: paramDetail() ? '<span style="font-style:italic;">' + escapeHtml(paramDetail()).replace(/\n/g, '<br>') + '</span>' : '', forfait: configF, tma: configT },
+      { label: 'Recette et ajustement', desc: '<strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement', forfait: recetteForfaitFinal, tma: recetteTMAFinal },
+      { label: 'Mise en production', desc: nbEnv > 0 ? nbEnv + ' environnement' + (nbEnv > 1 ? 's' : '') : '', forfait: mepDaysFinal, tma: 0 },
+      { label: 'Documentation', desc: 'DEX, DAT, passation support', forfait: docDaysFinal, tma: 0 },
+      { label: 'VSR', desc: 'accompagnement et correction post-livraison', forfait: 0, tma: vsrDaysFinal },
+      { label: 'Connecteurs', desc: connDetail, forfait: connForfait, tma: connTMA },
+      { label: 'Formation', desc: nbSess > 0 ? nbSess + ' session' + (nbSess > 1 ? 's' : '') + ' (une session équivaut à 3h, max 8 participants, facturée 0,5 j par session)' : '', forfait: 0, tma: formDaysFinal },
+    ];
+
+    // Colonnes non pertinentes -> tiret dans le tableau (pas "0 j")
+    setNA('v-spec-t');
+    setNA('v-mep-t');
+    setNA('v-doc-t');
+    setNA('v-vsr-f');
+    setNA('v-formation-f');
+
+    updateTotalAndMail(items, 'split');
+  }
+
+  function onAteliersChange() {
+    atelierTouched = true;
+    updateNormal();
+  }
+
+  // ── Type "préconfiguré" ───────────────────────────────────
+  function updatePreconf() {
+    const GESTION_PC = 1;
+    const ATELIER_PC = 0.5;
+    const PARAM_PC = 3.5;
+    const RECETTE_PC = 1;
+    const VSR_PC = 0;
+    const PARAM_PC_DESC = 'Environnement cloud, installation préconfigurée, configuration, DEX.';
+
+    const dConn = document.getElementById('d-connecteurs-pc');
+    if (!dConn.querySelector('#in-connecteurs-pc')) {
+      dConn.innerHTML = qtyLine('connecteur(s) ; 0 = aucun, 1 connecteur = 0,5 j', 'in-connecteurs-pc', 0, 0, 10, 1, 'updatePreconf()');
+    }
+    const nbConn = ival('in-connecteurs-pc');
+    const connDays = nbConn * 0.5;
+    document.getElementById('n-connecteurs-pc').firstChild.textContent = 'Connecteur' + (nbConn > 1 ? 's' : '');
+
+    const dForm = document.getElementById('d-formation-pc');
+    if (!dForm.querySelector('#in-sessions-pc')) {
+      dForm.innerHTML = qtyLine('session(s) ; 0 = aucune, une session équivaut à 3h, max 8 participants, facturée 0,5 j par session', 'in-sessions-pc', 0, 0, 20, 1, 'updatePreconf()');
+    }
+    const nbSess = ival('in-sessions-pc');
+    const formDays = nbSess * 0.5;
+
+    setValue('v-gestion-pc', GESTION_PC);
+    setValue('v-atelier-pc', ATELIER_PC);
+    setValue('v-param-pc', PARAM_PC);
+    setValue('v-recette-pc', RECETTE_PC);
+    setValue('v-connecteurs-pc', connDays);
+    setValue('v-vsr-pc', VSR_PC);
+    setValue('v-formation-pc', formDays);
+
+    const items = [
+      { label: 'Gestion de projet',       desc: '1 kick-off et suivi', val: GESTION_PC, option: false },
+      { label: 'Atelier spécifications',  desc: 'atelier de 2h ; cadrage du besoin client', val: ATELIER_PC, option: false },
+      { label: 'Paramétrage',             desc: PARAM_PC_DESC, val: PARAM_PC, option: false },
+      { label: 'Recette',                 desc: 'validation et ajustements client', val: RECETTE_PC, option: false },
+      { label: 'Connecteur' + (nbConn > 1 ? 's' : ''), desc: nbConn > 0 ? nbConn + ' × 0,5 j' : '', val: connDays, option: false },
+      { label: 'VSR',                     desc: '', val: VSR_PC, option: false },
+      { label: 'Formation',               desc: nbSess > 0 ? nbSess + ' session' + (nbSess > 1 ? 's' : '') + ' × 0,5 j' : '', val: formDays, option: true },
+    ];
+    updateTotalAndMail(items);
+  }
+
+  // ── Total + mail (commun aux 3 types) ─────────────────────
+  function updateTotalAndMail(items, mode) {
+    if (mode === 'split') {
+      const numericItems = items.filter(it => !it.isNote);
+      const totalForfait = numericItems.reduce((s, it) => s + it.forfait, 0);
+      const totalTMA = numericItems.reduce((s, it) => s + it.tma, 0);
+      const totalGrand = totalForfait + totalTMA;
+
+      setValue('v-total-forfait-col', totalForfait);
+      setValue('v-total-tma-col', totalTMA);
+      document.getElementById('total-display-grand').textContent = fmtJour(totalGrand);
+      document.getElementById('total-sub-split').textContent = fmtJour(totalForfait) + ' forfait + ' + fmtJour(totalTMA) + ' TMA';
+
+      buildMailSplit(items, totalForfait, totalTMA);
+      return;
+    }
+
+    const numericItems = items.filter(it => !it.isNote);
+    const total = numericItems.reduce((s, it) => s + it.val, 0);
+    const totalSansOption = numericItems.filter(it => !it.option).reduce((s, it) => s + it.val, 0);
+    const hasOption = numericItems.some(it => it.option && it.val > 0);
+
+    document.getElementById('total-display').textContent = fmtJour(total);
+    document.getElementById('total-sub').textContent = hasOption
+      ? fmt(totalSansOption) + ' hors formation'
+      : '';
+
+    buildMail(items, total, totalSansOption, hasOption);
+  }
+
+  // ── Mail : type "Projet" (colonnes Forfait / TMA) ──────────
+  function buildMailSplit(items, totalForfait, totalTMA) {
+    let rows = '';
+    items.forEach(it => {
+      if (it.isNote) {
+        if (it.text) {
+          rows += `<tr><td colspan="3" style="padding:6px 12px 6px 0;color:#666;font-size:12px;font-style:italic;border-bottom:1px solid #eee;">${escapeHtml(it.text).replace(/\n/g, '<br>')}</td></tr>`;
+        }
+        return;
+      }
+      if (it.forfait === 0 && it.tma === 0) return; // rien à afficher sur cette ligne
+
+      const descStyle = 'color:#666;font-size:11px;';
+      rows += `
+        <tr>
+          <td style="padding:5px 12px 5px 0;color:#222;font-weight:bold;border-bottom:1px solid #eee;">
+            ${it.label}
+            ${it.desc ? '<br><span style="' + descStyle + '">' + it.desc + '</span>' : ''}
+          </td>
+          <td style="padding:5px 0;color:#1a6abf;font-weight:bold;text-align:right;border-bottom:1px solid #eee;white-space:nowrap;">
+            ${it.forfait > 0 ? fmt(it.forfait) : '—'}
+          </td>
+          <td style="padding:5px 0 5px 12px;color:#555;font-weight:bold;text-align:right;border-bottom:1px solid #eee;white-space:nowrap;">
+            ${it.tma > 0 ? fmt(it.tma) : '—'}
+          </td>
+        </tr>`;
+    });
+
+    const totalGrand = totalForfait + totalTMA;
+
+    const html = `
+      <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
+        Concernant le chiffrage demandé, le total est de <b>${fmt(totalGrand)}</b> (dont <b>${fmt(totalForfait)}</b> au forfait, et <b>${fmt(totalTMA)}</b> en TMA).
+      </p>
+      <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
+        <thead>
+          <tr>
+            <td></td>
+            <td style="padding:0 0 4px;color:#888;font-size:10px;text-transform:uppercase;text-align:right;">Forfait</td>
+            <td style="padding:0 0 4px 12px;color:#888;font-size:10px;text-transform:uppercase;text-align:right;">TMA*</td>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+          <tr>
+            <td style="padding:8px 12px 4px 0;color:#222;font-weight:bold;border-top:2px solid #1a6abf;">Total forfait</td>
+            <td style="padding:8px 0 4px;color:#1a6abf;font-weight:bold;text-align:right;border-top:2px solid #1a6abf;">${fmt(totalForfait)}</td>
+            <td style="border-top:2px solid #1a6abf;"></td>
+          </tr>
+          <tr>
+            <td style="padding:4px 12px 4px 0;color:#222;font-weight:bold;">Total TMA</td>
+            <td></td>
+            <td style="padding:4px 0 4px 12px;color:#555;font-weight:bold;text-align:right;">${fmt(totalTMA)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 8px 0;color:#222;font-weight:bold;border-top:1px solid #1a6abf;">Total</td>
+            <td colspan="2" style="padding:6px 0 8px;color:#1a6abf;font-weight:bold;text-align:right;border-top:1px solid #1a6abf;">${fmt(totalGrand)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin:10px 0 0;color:#888;font-family:Arial,sans-serif;font-size:11px;font-style:italic;">
+        * TMA : enveloppe prévisionnelle, consommée au réel ; si insuffisante, une commande supplémentaire pourra être demandée en cours de projet.
+      </p>
+      <p style="margin:16px 0 0;color:#555;font-family:Arial,sans-serif;font-size:13px;">
+        Je reste disponible si vous avez besoin de détails complémentaires.
+      </p>`;
+
+    document.getElementById('mail-render').innerHTML = html;
+  }
+
+  // ── Mail : type "Préconfiguré" (colonne unique) ──
+  function buildMail(items, total, totalSansOption, hasOption) {
+    const totalStr = fmt(total);
+    const totalSansStr = fmt(totalSansOption);
+
+    let introTotal = hasOption && totalSansOption !== total
+      ? `<b>${totalSansStr}</b> hors formation, et <b>${totalStr}</b> avec la formation`
+      : `<b>${totalStr}</b>`;
+
+    let rows = '';
+    items.forEach(it => {
+      if (it.isNote) {
+        if (it.text) {
+          rows += `<tr><td colspan="2" style="padding:6px 12px 6px 0;color:#666;font-size:12px;font-style:italic;border-bottom:1px solid #eee;">${escapeHtml(it.text).replace(/\n/g, '<br>')}</td></tr>`;
+        }
+        return;
+      }
+      if (it.val === 0) return; // on n'affiche pas les éléments à 0 dans le mail
+
+      const nameStyle = it.option ? 'color:#555;' : 'color:#222;font-weight:bold;';
+      const valStyle = 'color:#1a6abf;font-weight:bold;text-align:right;';
+      const descStyle = 'color:#666;font-size:11px;';
+      const optTag = it.option ? ' <span style="color:#aaa;font-size:10px;">(option)</span>' : '';
+
+      rows += `
+        <tr>
+          <td style="padding:5px 12px 5px 0;${nameStyle}border-bottom:1px solid #eee;">
+            ${it.label}${optTag}
+            ${it.desc ? '<br><span style="' + descStyle + '">' + it.desc + '</span>' : ''}
+          </td>
+          <td style="padding:5px 0;${valStyle}border-bottom:1px solid #eee;white-space:nowrap;">
+            ${fmt(it.val)}
+          </td>
+        </tr>`;
+    });
+
+    const totalRowHtml = hasOption && totalSansOption !== total
+      ? `<tr>
+          <td style="padding:8px 12px 4px 0;color:#222;font-weight:bold;border-top:2px solid #1a6abf;">Total hors formation</td>
+          <td style="padding:8px 0 4px;color:#1a6abf;font-weight:bold;text-align:right;border-top:2px solid #1a6abf;">${totalSansStr}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 12px 8px 0;color:#222;font-weight:bold;">Total avec formation</td>
+          <td style="padding:4px 0 8px;color:#1a6abf;font-weight:bold;text-align:right;">${totalStr}</td>
+        </tr>`
+      : `<tr>
+          <td style="padding:8px 12px 8px 0;color:#222;font-weight:bold;border-top:2px solid #1a6abf;">Total</td>
+          <td style="padding:8px 0;color:#1a6abf;font-weight:bold;text-align:right;border-top:2px solid #1a6abf;">${totalStr}</td>
+        </tr>`;
+
+    const html = `
+      <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
+        Concernant le chiffrage demandé, le total est de ${introTotal}.<br>
+        Ci-dessous le détail :
+      </p>
+      <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
+        <tbody>
+          ${rows}
+          ${totalRowHtml}
+        </tbody>
+      </table>
+      <p style="margin:16px 0 0;color:#555;font-family:Arial,sans-serif;font-size:13px;">
+        Je reste disponible si vous avez besoin de détails complémentaires.
+      </p>`;
+
+    document.getElementById('mail-render').innerHTML = html;
+  }
+
+  function copyMail() {
+    const mailEl = document.getElementById('mail-render');
+    if (!mailEl.innerHTML || mailEl.innerHTML.trim() === '') return;
+
+    const blob = new Blob([mailEl.innerHTML], { type: 'text/html' });
+    const item = new ClipboardItem({ 'text/html': blob });
+    navigator.clipboard.write([item]).then(() => {
+      const btn = document.getElementById('btn-copy');
+      btn.textContent = 'Copié !';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copier mail'; btn.classList.remove('copied'); }, 2000);
+    }).catch(() => {
+      const text = mailEl.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('btn-copy');
+        btn.textContent = 'Copié (texte)';
+        setTimeout(() => { btn.textContent = 'Copier mail'; }, 2000);
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
+  // ═══════════════════════════════════════════════════════════
+
+  const CSV_COLUMNS = ['id', 'client', 'demande', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html'];
+
+  // ── Parsing/sérialisation CSV (RFC4180 simplifié : guillemets doublés, virgules et sauts de ligne dans les champs) ──
+  function parseCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // BOM
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else {
+        if (c === '"') inQuotes = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\r') { /* ignoré, \n gère le saut de ligne */ }
+        else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+        else field += c;
+      }
+    }
+    if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+    if (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') rows.pop();
+    return rows;
+  }
+
+  function csvField(v) {
+    v = (v === undefined || v === null) ? '' : String(v);
+    if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }
+
+  function serializeCSV(rows) {
+    const lines = [CSV_COLUMNS.join(',')];
+    rows.forEach(d => lines.push(CSV_COLUMNS.map(c => csvField(d[c])).join(',')));
+    return '﻿' + lines.join('\r\n') + '\r\n';
+  }
+
+  function rowsFromCSVText(text) {
+    const rows = parseCSV(text);
+    if (!rows.length) return [];
+    const header = rows[0];
+    return rows.slice(1).filter(r => r.length > 1 || r[0] !== '').map(r => {
+      const obj = {};
+      header.forEach((h, idx) => { obj[h] = r[idx] !== undefined ? r[idx] : ''; });
+      return obj;
+    });
+  }
+
+  // Suivi des lignes touchées localement depuis le dernier enregistrement réussi : seules
+  // celles-ci doivent écraser la version disque à la sauvegarde ; toute autre ligne passe
+  // telle quelle depuis le fichier, pour ne pas piétiner le travail d'un collègue en parallèle.
+  let dirtyDemandeIds = new Set();
+  let deletedDemandeIds = new Set();
+
+  function buildMergedForSave(baseRows) {
+    // Fusionne un jeu de lignes "de base" (le fichier partagé, à la lecture ou à l'écriture)
+    // avec notre travail local en attente : nos lignes créées/modifiées (dirty) l'emportent,
+    // nos suppressions locales s'appliquent, et tout le reste passe tel quel (donc les
+    // modifications d'un collègue sur des lignes qu'on n'a pas touchées sont préservées).
+    const byId = {};
+    baseRows.forEach(d => { byId[d.id] = d; });
+    deletedDemandeIds.forEach(id => { delete byId[id]; });
+    const localById = {};
+    demandes.forEach(d => { localById[d.id] = d; });
+    dirtyDemandeIds.forEach(id => { if (localById[id]) byId[id] = localById[id]; });
+    return Object.values(byId);
+  }
+
+  // ── Persistance locale (localStorage) : le poste de travail au quotidien ──
+  // On bosse toujours en local d'abord (rapide, aucune permission navigateur à gérer) ; le
+  // fichier CSV partagé n'est lu/écrit que sur action explicite ("Charger"/"Enregistrer").
+  const LS_KEY = 'chiffrage-demandes-v1';
+  function persistLocal() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(demandes)); } catch (e) { console.error('localStorage indisponible', e); }
+  }
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function commitLocal() {
+    persistLocal();
+    renderDemandesTable();
+  }
+
+  // ── IndexedDB : mémorise le FileSystemFileHandle d'une session à l'autre ──
+  const IDB_NAME = 'chiffrage-demandes-db';
+  const IDB_STORE = 'handles';
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSaveHandle(handle) {
+    try {
+      const db = await idbOpen();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(handle, 'csv');
+        tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) { console.error('idbSaveHandle', e); }
+  }
+  async function idbLoadHandle() {
+    try {
+      const db = await idbOpen();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get('csv');
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) { return null; }
+  }
+
+  // ── Connexion / lecture / écriture du fichier (File System Access API) ──
+  function setFileStatus(msg) {
+    const el = document.getElementById('file-status-text');
+    if (el) el.textContent = msg;
+  }
+
+  async function verifyPermission(handle, forWrite) {
+    const opts = { mode: forWrite ? 'readwrite' : 'read' };
+    if ((await handle.queryPermission(opts)) === 'granted') return true;
+    if ((await handle.requestPermission(opts)) === 'granted') return true;
+    return false;
+  }
+
+  function updateFileButtons() {
+    if (!fileApiSupported) return; // le mode fallback gère ses propres boutons
+    const connected = !!fileHandle;
+    document.getElementById('btn-reload-file').classList.toggle('hidden', !connected);
+    document.getElementById('btn-save-file').classList.toggle('hidden', !connected);
+  }
+
+  async function connectFile() {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }],
+        excludeAcceptAllOption: false,
+        multiple: false
+      });
+      fileHandle = handle;
+      await idbSaveHandle(handle);
+      document.getElementById('btn-reconnect-file').classList.add('hidden');
+      updateFileButtons();
+      await loadFromFileHandle();
+    } catch (e) {
+      if (e.name !== 'AbortError') { console.error(e); setFileStatus('Erreur à l’ouverture du fichier : ' + e.message); }
+    }
+  }
+
+  async function reconnectFile() {
+    if (!fileHandle) return;
+    const perm = await verifyPermission(fileHandle, true);
+    if (perm) {
+      document.getElementById('btn-reconnect-file').classList.add('hidden');
+      await loadFromFileHandle();
+    } else {
+      setFileStatus('Permission refusée pour "' + fileHandle.name + '".');
+    }
+  }
+
+  // ── "Charger depuis le fichier" (action explicite) : fusionne le contenu du fichier partagé
+  // avec notre travail local en attente, sans jamais écraser une modif locale pas encore publiée.
+  async function loadFromFileHandle() {
+    if (!fileHandle) return;
+    const already = (await fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
+    if (!already) {
+      setFileStatus('Fichier "' + fileHandle.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
+      document.getElementById('btn-reconnect-file').classList.remove('hidden');
+      return;
+    }
+    try {
+      const file = await fileHandle.getFile();
+      const text = await file.text();
+      const fileRows = text.trim() ? rowsFromCSVText(text) : [];
+      demandes = buildMergedForSave(fileRows);
+      persistLocal();
+      setFileStatus('Chargé depuis ' + fileHandle.name + ' — ' + demandes.length + ' demande(s).');
+      renderDemandesTable();
+    } catch (e) {
+      console.error(e);
+      setFileStatus('Impossible de lire le fichier : ' + e.message);
+    }
+  }
+
+  // ── "Enregistrer dans le fichier" (action explicite) : relit le fichier, fusionne avec nos
+  // lignes créées/modifiées/supprimées localement, puis publie le résultat — c'est le seul
+  // moment où on écrit sur le fichier partagé.
+  async function saveDemandes() {
+    if (fileHandle) {
+      try {
+        const perm = await verifyPermission(fileHandle, true);
+        if (!perm) throw new Error('permission refusée');
+        let onDisk = [];
+        try {
+          const file = await fileHandle.getFile();
+          const text = await file.text();
+          onDisk = text.trim() ? rowsFromCSVText(text) : [];
+        } catch (e) { /* fichier neuf/vide : tant pis, on part de local seul */ }
+        const merged = buildMergedForSave(onDisk);
+        const writable = await fileHandle.createWritable();
+        await writable.write(serializeCSV(merged));
+        await writable.close();
+        demandes = merged;
+        dirtyDemandeIds.clear();
+        deletedDemandeIds.clear();
+        persistLocal();
+        setFileStatus('Enregistré dans ' + fileHandle.name + ' — ' + new Date().toLocaleTimeString('fr-FR'));
+      } catch (e) {
+        console.error(e);
+        setFileStatus('Échec de l’enregistrement : ' + e.message + ' (tes changements restent en local, réessaie).');
+      }
+    } else if (!fileApiSupported) {
+      setFileStatus('Non sauvegardé sur disque — pense à cliquer "Télécharger CSV" pour publier tes changements.');
+    } else {
+      setFileStatus('Aucun fichier connecté — clique "Choisir le fichier CSV…" pour commencer à sauvegarder.');
+    }
+    renderDemandesTable();
+  }
+
+  // ── Fallback navigateurs sans File System Access API (Firefox, Safari) ──
+  function setupFallbackUI() {
+    document.getElementById('btn-connect-file').classList.add('hidden');
+    document.getElementById('btn-reload-file').classList.add('hidden');
+    document.getElementById('btn-save-file').classList.add('hidden');
+    document.getElementById('btn-import-fallback').classList.remove('hidden');
+    document.getElementById('btn-export-fallback').classList.remove('hidden');
+    setFileStatus("Ton navigateur ne permet pas d'écrire directement sur un fichier : utilise Importer/Télécharger, et redépose le fichier téléchargé dans le dossier partagé.");
+  }
+
+  function handleCsvImport(evt) {
+    const file = evt.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const fileRows = reader.result.trim() ? rowsFromCSVText(reader.result) : [];
+      demandes = buildMergedForSave(fileRows); // protège nos éventuelles modifs locales pas encore exportées
+      persistLocal();
+      setFileStatus('CSV importé (' + file.name + ') — pense à re-télécharger après tes changements.');
+      renderDemandesTable();
+    };
+    reader.readAsText(file, 'utf-8');
+    evt.target.value = '';
+  }
+
+  function downloadCsv() {
+    const blob = new Blob([serializeCSV(demandes)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'demandes_chiffrage.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    dirtyDemandeIds.clear();
+    deletedDemandeIds.clear();
+    persistLocal();
+    setFileStatus('CSV téléchargé — dépose-le dans le dossier partagé pour que l’équipe le voie.');
+  }
+
+  // ── Navigation entre vues ──
+  function showView(view) {
+    document.getElementById('view-chiffrage').classList.toggle('hidden', view !== 'chiffrage');
+    document.getElementById('view-suivi').classList.toggle('hidden', view !== 'suivi');
+    document.getElementById('nav-suivi').classList.toggle('active', view === 'suivi');
+    if (view === 'suivi') renderDemandesTable();
+  }
+
+  // ── Rendu de la liste ──
+  function truncateText(s, n) { return s && s.length > n ? s.slice(0, n - 1) + '…' : (s || ''); }
+  function formatDateFr(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderDemandesTable() {
+    const tbody = document.getElementById('demandes-tbody');
+    if (!tbody) return;
+    const sorted = [...demandes].sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''));
+    if (!sorted.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Aucune demande pour l’instant.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = sorted.map(d => {
+      const totalTxt = d.total_forfait ? escapeHtml(d.total_forfait) + (d.total_tma ? ' + ' + escapeHtml(d.total_tma) + ' TMA' : '') : '—';
+      return `
+        <tr>
+          <td>${escapeHtml(d.client || '')}</td>
+          <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(truncateText(d.demande || '', 70))}</td>
+          <td>${escapeHtml(d.statut || '')}</td>
+          <td>${totalTxt}</td>
+          <td>${formatDateFr(d.date_maj)}</td>
+          <td class="demande-actions">
+            <button class="btn-action" onclick="openDemande('${d.id}')">Ouvrir</button>
+            <button class="btn-action" onclick="deleteDemande('${d.id}')">Supprimer</button>
+          </td>
+        </tr>`;
+    }).join('');
+  }
+
+  // ── Formulaire nouvelle demande ──
+  function openNewDemandeForm() {
+    document.getElementById('new-demande-form').classList.remove('hidden');
+    document.getElementById('nd-client').value = '';
+    document.getElementById('nd-demande').value = '';
+    document.getElementById('nd-client').focus();
+  }
+  function cancelNewDemandeForm() {
+    document.getElementById('new-demande-form').classList.add('hidden');
+  }
+
+  function createDemande() {
+    const client = document.getElementById('nd-client').value.trim();
+    const demandeText = document.getElementById('nd-demande').value.trim();
+    if (!client) { alert('Renseigne au moins le nom du client.'); return; }
+    const now = new Date().toISOString();
+    const d = {
+      id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      client, demande: demandeText,
+      statut: STATUTS[0],
+      date_creation: now, date_maj: now,
+      type: '', total_forfait: '', total_tma: '',
+      etat_json: '', mail_html: ''
+    };
+    demandes.push(d);
+    dirtyDemandeIds.add(d.id);
+    cancelNewDemandeForm();
+    commitLocal();
+    openDemande(d.id);
+  }
+
+  function deleteDemande(id) {
+    if (!confirm('Supprimer cette demande ? C’est irréversible.')) return;
+    demandes = demandes.filter(d => d.id !== id);
+    dirtyDemandeIds.delete(id);
+    deletedDemandeIds.add(id);
+    if (currentDemandeId === id) { currentDemandeId = null; hideDemandeContextBar(); }
+    commitLocal();
+  }
+
+  // ── Barre de contexte "demande ouverte" au-dessus du calculateur ──
+  function showDemandeContextBar(d) {
+    document.getElementById('demande-context').classList.remove('hidden');
+    document.getElementById('ctx-client').textContent = d.client || '(sans nom)';
+    document.getElementById('ctx-demande').textContent = d.demande || '';
+    const sel = document.getElementById('ctx-statut');
+    sel.innerHTML = STATUTS.map(s => `<option value="${escapeHtml(s)}"${s === d.statut ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
+  }
+  function hideDemandeContextBar() {
+    document.getElementById('demande-context').classList.add('hidden');
+  }
+
+  function onStatutChange() {
+    if (!currentDemandeId) return;
+    const d = demandes.find(x => x.id === currentDemandeId);
+    if (!d) return;
+    d.statut = document.getElementById('ctx-statut').value;
+    syncCurrentDemandeFromCalculator();
+    commitLocal();
+  }
+
+  // "Enregistrer" dans la barre de contexte du calculateur ne fait que committer en local —
+  // la publication vers le fichier partagé reste une action à part, depuis la vue Suivi.
+  function manualSave() {
+    if (!currentDemandeId) return;
+    syncCurrentDemandeFromCalculator();
+    commitLocal();
+  }
+
+  function backToSuivi() {
+    if (currentDemandeId) syncCurrentDemandeFromCalculator();
+    commitLocal();
+    currentDemandeId = null;
+    hideDemandeContextBar();
+    showView('suivi');
+  }
+
+  // ── Capture/restauration de l'état complet du calculateur (pour reprendre une demande plus tard) ──
+  function captureFullState() {
+    const fields = {};
+    document.querySelectorAll('#chiffrage-body input, #chiffrage-body textarea').forEach(el => { fields[el.id] = el.value; });
+    return {
+      currentType,
+      atelierTouched,
+      paramRevealed,
+      manualTouched: Array.from(manualTouched),
+      fields
+    };
+  }
+
+  function readCurrentTotal(kind) {
+    if (currentType === 'normal') {
+      const el = document.getElementById(kind === 'forfait' ? 'v-total-forfait-col' : 'v-total-tma-col');
+      return el ? el.textContent.trim() : '';
+    }
+    if (kind === 'forfait') {
+      const el = document.getElementById('total-display');
+      return el ? el.textContent.trim() : '';
+    }
+    return '';
+  }
+
+  function syncCurrentDemandeFromCalculator() {
+    if (!currentDemandeId) return;
+    const d = demandes.find(x => x.id === currentDemandeId);
+    if (!d) return;
+    const mailEl = document.getElementById('mail-render');
+    d.type = currentType || '';
+    d.etat_json = currentType ? JSON.stringify(captureFullState()) : '';
+    d.mail_html = mailEl ? mailEl.innerHTML : '';
+    d.total_forfait = readCurrentTotal('forfait');
+    d.total_tma = readCurrentTotal('tma');
+    d.date_maj = new Date().toISOString();
+    dirtyDemandeIds.add(currentDemandeId);
+  }
+
+  function loadDemandeIntoCalculatorState(d) {
+    let state = null;
+    if (d.etat_json) {
+      try { state = JSON.parse(d.etat_json); } catch (e) { state = null; }
+    }
+    if (!state || !state.currentType) return; // rien à restaurer : on laisse l'écran vierge (aucun type choisi)
+
+    currentType = state.currentType;
+    atelierTouched = !!state.atelierTouched;
+    manualTouched = new Set(state.manualTouched || []);
+    paramRevealed = !!state.paramRevealed;
+
+    applyTypeChrome(currentType);
+
+    if (paramRevealed) {
+      document.getElementById('chiffrage-body').innerHTML = TEMPLATES[currentType].full();
+      document.getElementById('right-actions').style.display = 'flex';
+    } else {
+      document.getElementById('chiffrage-body').innerHTML = TEMPLATES[currentType].gate();
+      document.getElementById('right-actions').style.display = 'none';
+      document.getElementById('total-block-single').classList.add('hidden');
+      document.getElementById('total-block-split').classList.add('hidden');
+    }
+
+    Object.keys(state.fields || {}).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = state.fields[id];
+    });
+
+    update();
+  }
+
+  function openDemande(id) {
+    const d = demandes.find(x => x.id === id);
+    if (!d) return;
+    currentDemandeId = id;
+    showView('chiffrage');
+    resetCalculatorUI();
+    showDemandeContextBar(d);
+    loadDemandeIntoCalculatorState(d);
+  }
+
+  // ── Initialisation au chargement de la page ──
+  // On travaille toujours en local d'abord (instantané, aucune permission à redemander) ;
+  // le fichier CSV partagé, lui, n'est lu/écrit que sur action explicite ("Charger"/"Enregistrer").
+  (function initLocal() {
+    demandes = loadLocal();
+    renderDemandesTable();
+  })();
+
+  (async function initFileConnection() {
+    if (!fileApiSupported) { setupFallbackUI(); return; }
+    const handle = await idbLoadHandle();
+    if (!handle) {
+      setFileStatus('Travail local (' + demandes.length + ' demande(s)) — clique "Choisir le fichier CSV…" pour connecter le fichier partagé.');
+      return;
+    }
+    fileHandle = handle;
+    updateFileButtons();
+    const already = (await handle.queryPermission({ mode: 'readwrite' })) === 'granted';
+    if (already) {
+      setFileStatus('Fichier "' + handle.name + '" connecté — clique "Charger" ou "Enregistrer" pour synchroniser.');
+    } else {
+      setFileStatus('Fichier "' + handle.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
+      document.getElementById('btn-reconnect-file').classList.remove('hidden');
+    }
+  })();
+
+  // Garde-fou : si des changements n'ont pas encore été publiés dans le fichier partagé,
+  // on prévient avant de fermer l'onglet (ils restent en local, mais l'équipe ne les voit pas encore).
+  window.addEventListener('beforeunload', function (e) {
+    if (fileHandle && (dirtyDemandeIds.size > 0 || deletedDemandeIds.size > 0)) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+</script>
+</body>
+</html>
