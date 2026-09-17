@@ -186,6 +186,16 @@
   .demandes-table tbody tr:last-child td { border-bottom: none; }
   .demandes-table tbody tr:hover { background: var(--accent-glow); }
   .demande-cell { max-width: 320px; }
+  .comment-flag {
+    color: var(--text-mid);
+    font-size: 11px;
+    white-space: nowrap;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: bottom;
+  }
   .demande-actions { display: flex; gap: 6px; white-space: nowrap; }
   .empty-row { color: var(--text-dim); font-style: italic; text-align: center; }
 
@@ -414,6 +424,28 @@
     color: var(--accent);
   }
 
+  /* ── Commentaire interne (alertes, points de vigilance…) ── */
+  .comment-block { padding: 4px 20px 16px; }
+  .comment-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+  .comment-textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    padding: 8px 10px;
+    outline: none;
+    resize: vertical;
+  }
+  .comment-textarea:focus { border-color: var(--accent); }
+
   /* ── Mail preview (masqué par défaut) ── */
   .mail-divider {
     border: none;
@@ -520,7 +552,7 @@
 
     <table class="demandes-table">
       <thead>
-        <tr><th>Client</th><th>Demande</th><th>Statut</th><th>Total</th><th>Dernière maj</th><th></th></tr>
+        <tr><th>Client</th><th>Demande</th><th>Statut</th><th>Total</th><th>Commentaire</th><th>Dernière maj</th><th></th></tr>
       </thead>
       <tbody id="demandes-tbody"></tbody>
     </table>
@@ -579,6 +611,11 @@
           <div class="total-sub" id="total-sub-split"></div>
         </div>
         <div class="total-value" id="total-display-grand">—</div>
+      </div>
+
+      <div class="comment-block">
+        <label class="comment-label" for="chiffrage-comment">Commentaire (repris tel quel dans le mail, sous le total)</label>
+        <textarea id="chiffrage-comment" class="comment-textarea" rows="2" placeholder="Ex : chiffrage valable 30 jours, hors formation des utilisateurs finaux…" oninput="update()"></textarea>
       </div>
 
       <div id="mail-block" class="hidden">
@@ -685,6 +722,7 @@
     document.getElementById('chiffrage-body').innerHTML = '';
     document.getElementById('total-block-single').classList.remove('hidden');
     document.getElementById('total-block-split').classList.add('hidden');
+    document.getElementById('chiffrage-comment').value = '';
   }
 
   function resetAll() {
@@ -1274,6 +1312,14 @@
     buildMail(items, total, totalSansOption, hasOption);
   }
 
+  // ── Commentaire libre, repris tel quel dans le mail (les deux types) ──
+  function mailCommentBlock() {
+    const el = document.getElementById('chiffrage-comment');
+    const text = el ? el.value.trim() : '';
+    if (!text) return '';
+    return `<p style="margin:12px 0 0;color:#222;font-family:Arial,sans-serif;font-size:13px;">${escapeHtml(text).replace(/\n/g, '<br>')}</p>`;
+  }
+
   // ── Mail : type "Projet" (colonnes Forfait / TMA) ──────────
   function buildMailSplit(items, totalForfait, totalTMA) {
     let rows = '';
@@ -1337,6 +1383,7 @@
       <p style="margin:10px 0 0;color:#888;font-family:Arial,sans-serif;font-size:11px;font-style:italic;">
         * TMA : enveloppe prévisionnelle, consommée au réel ; si insuffisante, une commande supplémentaire pourra être demandée en cours de projet.
       </p>
+      ${mailCommentBlock()}
       <p style="margin:16px 0 0;color:#555;font-family:Arial,sans-serif;font-size:13px;">
         Je reste disponible si vous avez besoin de détails complémentaires.
       </p>`;
@@ -1405,6 +1452,7 @@
           ${totalRowHtml}
         </tbody>
       </table>
+      ${mailCommentBlock()}
       <p style="margin:16px 0 0;color:#555;font-family:Arial,sans-serif;font-size:13px;">
         Je reste disponible si vous avez besoin de détails complémentaires.
       </p>`;
@@ -1437,7 +1485,7 @@
   // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
   // ═══════════════════════════════════════════════════════════
 
-  const CSV_COLUMNS = ['id', 'client', 'demande', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html'];
+  const CSV_COLUMNS = ['id', 'client', 'demande', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'commentaire'];
 
   // ── Parsing/sérialisation CSV (RFC4180 simplifié : guillemets doublés, virgules et sauts de ligne dans les champs) ──
   function parseCSV(text) {
@@ -1725,17 +1773,21 @@
     if (!tbody) return;
     const sorted = [...demandes].sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''));
     if (!sorted.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Aucune demande pour l’instant.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Aucune demande pour l’instant.</td></tr>';
       return;
     }
     tbody.innerHTML = sorted.map(d => {
       const totalTxt = d.total_forfait ? escapeHtml(d.total_forfait) + (d.total_tma ? ' + ' + escapeHtml(d.total_tma) + ' TMA' : '') : '—';
+      const commentTxt = d.commentaire
+        ? `<span class="comment-flag" title="${escapeHtml(d.commentaire)}">💬 ${escapeHtml(truncateText(d.commentaire, 40))}</span>`
+        : '';
       return `
         <tr>
           <td>${escapeHtml(d.client || '')}</td>
           <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(truncateText(d.demande || '', 70))}</td>
           <td>${escapeHtml(d.statut || '')}</td>
           <td>${totalTxt}</td>
+          <td>${commentTxt}</td>
           <td>${formatDateFr(d.date_maj)}</td>
           <td class="demande-actions">
             <button class="btn-action" onclick="openDemande('${d.id}')">Ouvrir</button>
@@ -1852,9 +1904,11 @@
     const d = demandes.find(x => x.id === currentDemandeId);
     if (!d) return;
     const mailEl = document.getElementById('mail-render');
+    const commentEl = document.getElementById('chiffrage-comment');
     d.type = currentType || '';
     d.etat_json = currentType ? JSON.stringify(captureFullState()) : '';
     d.mail_html = mailEl ? mailEl.innerHTML : '';
+    d.commentaire = commentEl ? commentEl.value : '';
     d.total_forfait = readCurrentTotal('forfait');
     d.total_tma = readCurrentTotal('tma');
     d.date_maj = new Date().toISOString();
@@ -1862,6 +1916,11 @@
   }
 
   function loadDemandeIntoCalculatorState(d) {
+    // Le commentaire n'est pas propre à un type de chiffrage : on le restaure toujours,
+    // même si aucun calculateur n'a encore été rempli pour cette demande.
+    const commentEl = document.getElementById('chiffrage-comment');
+    if (commentEl) commentEl.value = d.commentaire || '';
+
     let state = null;
     if (d.etat_json) {
       try { state = JSON.parse(d.etat_json); } catch (e) { state = null; }
@@ -1885,11 +1944,21 @@
       document.getElementById('total-block-split').classList.add('hidden');
     }
 
-    Object.keys(state.fields || {}).forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = state.fields[id];
-    });
+    const applyFields = () => {
+      Object.keys(state.fields || {}).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = state.fields[id];
+      });
+    };
 
+    applyFields();
+    update();
+    // Certaines cases (nombre d'ateliers, de sessions, d'environnements...) sont créées
+    // dynamiquement par update()/updateNormal() la toute première fois : au passage
+    // précédent, elles n'existaient pas encore et n'ont donc pas pu recevoir leur valeur
+    // sauvegardée (elles ont pris une valeur par défaut à la place). On les réapplique
+    // maintenant qu'elles existent, puis on relance le calcul avec les valeurs définitives.
+    applyFields();
     update();
   }
 
