@@ -396,6 +396,38 @@
   .detail-textarea:focus { border-color: var(--accent); }
   .detail-textarea::placeholder { color: var(--text-dim); }
 
+  /* ── Zone de texte enrichi (gras, listes) : toolbar + contenteditable ── */
+  .richtext-wrap { width: 100%; }
+  .richtext-toolbar { display: flex; gap: 4px; margin-bottom: 4px; }
+  .rt-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 11px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .rt-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .rt-btn.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+  .richtext-input {
+    width: 100%;
+    min-height: 40px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .richtext-input:focus { border-color: var(--accent); }
+  .richtext-input:empty::before { content: attr(data-placeholder); color: var(--text-dim); font-style: italic; }
+  .richtext-input ul, .richtext-input ol { padding-left: 20px; margin: 4px 0; }
+  .comment-textarea.richtext-input { font-size: 13px; }
+
   .total-row {
     display: flex;
     justify-content: space-between;
@@ -454,6 +486,10 @@
   }
   .mail-preview { padding: 20px; }
   .mail-preview-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
     color: var(--text-dim);
@@ -586,7 +622,6 @@
       </div>
       <div class="right-actions" id="right-actions" style="display:none">
         <button class="btn-action" id="btn-mail-toggle" onclick="toggleMail()">Afficher l'aperçu mail</button>
-        <button class="btn-action" id="btn-copy" onclick="copyMail()">Copier mail</button>
       </div>
     </div>
 
@@ -615,13 +650,23 @@
 
       <div class="comment-block">
         <label class="comment-label" for="chiffrage-comment">Commentaire (repris tel quel dans le mail, sous le total)</label>
-        <textarea id="chiffrage-comment" class="comment-textarea" rows="2" placeholder="Ex : chiffrage valable 30 jours, hors formation des utilisateurs finaux…" oninput="update()"></textarea>
+        <div class="richtext-wrap">
+          <div class="richtext-toolbar">
+            <button type="button" class="rt-btn" data-cmd="bold" onmousedown="event.preventDefault()" onclick="richExec('chiffrage-comment','bold')"><b>G</b></button>
+            <button type="button" class="rt-btn" data-cmd="underline" onmousedown="event.preventDefault()" onclick="richExec('chiffrage-comment','underline')"><u>S</u></button>
+            <button type="button" class="rt-btn" data-cmd="insertUnorderedList" onmousedown="event.preventDefault()" onclick="richExec('chiffrage-comment','insertUnorderedList')">• Liste</button>
+          </div>
+          <div id="chiffrage-comment" class="richtext-input comment-textarea" contenteditable="true" data-placeholder="Ex : chiffrage valable 30 jours, hors formation des utilisateurs finaux…" oninput="update()" onpaste="richTextPastePlain(event)" onkeydown="richTextTab(event)" onblur="richTextClearToolbar('chiffrage-comment')"></div>
+        </div>
       </div>
 
       <div id="mail-block" class="hidden">
         <hr class="mail-divider">
         <div class="mail-preview">
-          <div class="mail-preview-label">Aperçu mail : copiable dans Outlook</div>
+          <div class="mail-preview-label">
+            <span>Aperçu mail : copiable dans Outlook</span>
+            <button class="btn-action" id="btn-copy" onclick="copyMail()">Copier mail</button>
+          </div>
           <div id="mail-render"></div>
         </div>
       </div>
@@ -702,6 +747,131 @@
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  // ── Zones de texte enrichi (gras, listes à puces/numérotées) ──
+  // Un bloc "toolbar + contenteditable" réutilisé pour le Commentaire, le détail Paramétrage
+  // et le détail Connecteurs : ce qu'on tape s'affiche mis en forme directement, et c'est
+  // repris tel quel (assaini) dans le mail généré.
+  function richTextField(id, placeholder) {
+    return `
+      <div class="richtext-wrap">
+        <div class="richtext-toolbar">
+          <button type="button" class="rt-btn" data-cmd="bold" onmousedown="event.preventDefault()" onclick="richExec('${id}','bold')"><b>G</b></button>
+          <button type="button" class="rt-btn" data-cmd="underline" onmousedown="event.preventDefault()" onclick="richExec('${id}','underline')"><u>S</u></button>
+          <button type="button" class="rt-btn" data-cmd="insertUnorderedList" onmousedown="event.preventDefault()" onclick="richExec('${id}','insertUnorderedList')">• Liste</button>
+        </div>
+        <div id="${id}" class="richtext-input" contenteditable="true" data-placeholder="${escapeHtml(placeholder)}" oninput="update()" onpaste="richTextPastePlain(event)" onkeydown="richTextTab(event)" onblur="richTextClearToolbar('${id}')"></div>
+      </div>`;
+  }
+
+  function richExec(id, cmd) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.focus();
+    try { document.execCommand('defaultParagraphSeparator', false, 'br'); } catch (e) {}
+    document.execCommand(cmd, false, null);
+    update();
+    richTextUpdateToolbar(id);
+  }
+
+  // Surligne dans la barre d'outils le(s) bouton(s) correspondant au formatage actif là où
+  // se trouve le curseur (gras/souligné/liste en cours), pour qu'on voie ce qui est appliqué.
+  function richTextUpdateToolbar(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const wrap = el.closest('.richtext-wrap');
+    const toolbar = wrap ? wrap.querySelector('.richtext-toolbar') : null;
+    if (!toolbar) return;
+    toolbar.querySelectorAll('.rt-btn[data-cmd]').forEach(btn => {
+      let active = false;
+      try { active = document.queryCommandState(btn.getAttribute('data-cmd')); } catch (e) {}
+      btn.classList.toggle('active', active);
+    });
+  }
+
+  // Le curseur bouge (flèches, clic, sélection à la souris) sans forcément déclencher input/click :
+  // on rafraîchit la barre d'outils de la zone enrichie actuellement active à chaque changement
+  // de sélection dans le document.
+  document.addEventListener('selectionchange', () => {
+    const ae = document.activeElement;
+    if (ae && ae.classList && ae.classList.contains('richtext-input')) {
+      richTextUpdateToolbar(ae.id);
+    }
+  });
+
+  // Quand on quitte vraiment une zone enrichie (clic ailleurs), on éteint sa barre d'outils —
+  // sinon un bouton resterait affiché "actif" sur un champ qu'on ne regarde plus.
+  function richTextClearToolbar(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const wrap = el.closest('.richtext-wrap');
+    const toolbar = wrap ? wrap.querySelector('.richtext-toolbar') : null;
+    if (!toolbar) return;
+    toolbar.querySelectorAll('.rt-btn.active').forEach(btn => btn.classList.remove('active'));
+  }
+
+  // Colle le presse-papier en texte brut (évite d'hériter du style/HTML d'un copier-coller Word/Outlook).
+  function richTextPastePlain(e) {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, text);
+  }
+
+  // Tab/Shift+Tab : imbrique/désimbrique le niveau de liste courant (uniquement si le curseur
+  // est dans un <li>, pour ne pas piéger le focus quand on tape en dehors d'une liste).
+  function richTextTab(e) {
+    if (e.key !== 'Tab') return;
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    let node = sel.anchorNode;
+    if (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    const li = node && node.nodeType === Node.ELEMENT_NODE ? node.closest('li') : null;
+    if (!li) return;
+    e.preventDefault();
+    document.execCommand(e.shiftKey ? 'outdent' : 'indent', false, null);
+  }
+
+  // N'autorise que gras/souligné/listes (multi-niveaux)/saut de ligne dans le HTML produit par une
+  // zone de texte enrichi ; tout le reste (styles, span, div hérités d'un collage) est réduit à son texte.
+  // OL reste autorisé en lecture pour rester compatible avec d'anciennes demandes déjà enregistrées,
+  // même si le bouton "liste numérotée" a été retiré de la barre d'outils.
+  function sanitizeRichHtml(html) {
+    const allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, UL: 1, OL: 1, LI: 1 };
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    function walk(node) {
+      let out = '';
+      node.childNodes.forEach(child => {
+        if (child.nodeType === Node.TEXT_NODE) {
+          out += escapeHtml(child.textContent);
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          const tag = child.tagName;
+          if (tag === 'BR') { out += '<br>'; return; }
+          if (tag === 'SCRIPT' || tag === 'STYLE') { return; } // jamais de contenu, même en texte
+          if (allowed[tag]) {
+            const lower = tag.toLowerCase();
+            out += '<' + lower + '>' + walk(child) + '</' + lower + '>';
+          } else if (tag === 'DIV' || tag === 'P') {
+            // Chrome insère parfois un <div> par ligne plutôt qu'un <br> : on convertit en saut de ligne.
+            out += walk(child) + '<br>';
+          } else {
+            out += walk(child); // balise inconnue : on garde le contenu, on jette la balise
+          }
+        }
+      });
+      return out;
+    }
+    return walk(container).replace(/(<br>)+$/, '');
+  }
+
+  // Lit/écrit la valeur d'un champ qu'il s'agisse d'un input/textarea classique (.value)
+  // ou d'une zone de texte enrichi (.innerHTML, assaini au passage) — utilisé partout où on
+  // capture/restaure l'état, pour que ce qui est stocké (CSV compris) reste toujours propre.
+  function getFieldRawValue(el) { return el.isContentEditable ? sanitizeRichHtml(el.innerHTML) : el.value; }
+  // Réassaini aussi à l'écriture (pas seulement à la lecture) : ce qui vient d'un CSV chargé depuis
+  // le dossier partagé n'est pas forcément fiable (fichier modifié à la main, corrompu, ou par un
+  // tiers) — on ne fait jamais confiance à du HTML stocké avant de l'injecter dans le DOM.
+  function setFieldRawValue(el, v) { if (el.isContentEditable) el.innerHTML = sanitizeRichHtml(v || ''); else el.value = v; }
+
   // ── Reset complet ─────────────────────────────────────────
   // resetCalculatorUI() remet juste l'écran calculateur à zéro (utilisé aussi bien par le
   // bouton "Nouveau chiffrage" que par l'ouverture d'une demande, qui elle garde son contexte).
@@ -722,7 +892,7 @@
     document.getElementById('chiffrage-body').innerHTML = '';
     document.getElementById('total-block-single').classList.remove('hidden');
     document.getElementById('total-block-split').classList.add('hidden');
-    document.getElementById('chiffrage-comment').value = '';
+    document.getElementById('chiffrage-comment').innerHTML = '';
   }
 
   function resetAll() {
@@ -736,11 +906,11 @@
   function captureParamValues() {
     const ids = ['in-install', 'in-dev', 'in-config', 'in-install-tma', 'in-dev-tma', 'in-config-tma', 'in-detail'];
     const vals = {};
-    ids.forEach(id => { const el = document.getElementById(id); if (el) vals[id] = el.value; });
+    ids.forEach(id => { const el = document.getElementById(id); if (el) vals[id] = getFieldRawValue(el); });
     return vals;
   }
   function applyParamValues(vals) {
-    Object.keys(vals).forEach(id => { const el = document.getElementById(id); if (el) el.value = vals[id]; });
+    Object.keys(vals).forEach(id => { const el = document.getElementById(id); if (el) setFieldRawValue(el, vals[id]); });
   }
 
   // ── Choix du type ────────────────────────────────────────
@@ -863,7 +1033,7 @@
     </div>
     <div class="tbl-row tbl-row-split tbl-row-detail">
       <div>
-        <textarea class="detail-textarea" id="in-detail" rows="2" placeholder="Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)" oninput="update()"></textarea>
+        ${richTextField('in-detail', "Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)")}
       </div>
     </div>
   `;
@@ -923,7 +1093,7 @@
       </div>
       <div class="tbl-row tbl-row-split tbl-row-detail">
         <div>
-          <textarea class="detail-textarea" id="in-detail" rows="2" placeholder="Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)" oninput="update()"></textarea>
+          ${richTextField('in-detail', "Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)")}
         </div>
       </div>
 
@@ -977,7 +1147,7 @@
       </div>
       <div class="tbl-row tbl-row-split tbl-row-detail">
         <div>
-          <textarea class="detail-textarea" id="in-connecteurs-detail" rows="2" placeholder="Précise les connecteurs concernés (ex : CRM, ERP...)" oninput="update()"></textarea>
+          ${richTextField('in-connecteurs-detail', "Précise les connecteurs concernés (ex : CRM, ERP...)")}
         </div>
       </div>
 
@@ -1109,7 +1279,7 @@
   }
   function paramDetail() {
     const el = document.getElementById('in-detail');
-    return el ? el.value.trim() : '';
+    return el ? getFieldRawValue(el).trim() : '';
   }
 
   function update() {
@@ -1147,7 +1317,7 @@
     const connForfait = val('in-connecteurs-f');
     const connTMA = val('in-connecteurs-t');
     const connDetailEl = document.getElementById('in-connecteurs-detail');
-    const connDetail = connDetailEl ? connDetailEl.value.trim() : '';
+    const connDetail = connDetailEl ? getFieldRawValue(connDetailEl).trim() : '';
 
     const dForm = document.getElementById('d-formation');
     if (!dForm.querySelector('#in-sessions')) {
@@ -1214,7 +1384,7 @@
       { label: 'Spécification et ateliers', desc: '<strong>Forfait :</strong> ' + nbAteliers + ' atelier' + (nbAteliers > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé', forfait: specForfaitFinal, tma: 0 },
       { label: 'Installation', desc: '', forfait: installF, tma: installT },
       { label: 'Développement', desc: '', forfait: devF, tma: devT },
-      { label: 'Paramétrage', desc: paramDetail() ? '<span style="font-style:italic;">' + escapeHtml(paramDetail()).replace(/\n/g, '<br>') + '</span>' : '', forfait: configF, tma: configT },
+      { label: 'Paramétrage', desc: paramDetail() ? '<span style="font-style:italic;">' + paramDetail() + '</span>' : '', forfait: configF, tma: configT },
       { label: 'Recette et ajustement', desc: '<strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement', forfait: recetteForfaitFinal, tma: recetteTMAFinal },
       { label: 'Mise en production', desc: nbEnv > 0 ? nbEnv + ' environnement' + (nbEnv > 1 ? 's' : '') : '', forfait: mepDaysFinal, tma: 0 },
       { label: 'Documentation', desc: 'DEX, DAT, passation support', forfait: docDaysFinal, tma: 0 },
@@ -1315,9 +1485,9 @@
   // ── Commentaire libre, repris tel quel dans le mail (les deux types) ──
   function mailCommentBlock() {
     const el = document.getElementById('chiffrage-comment');
-    const text = el ? el.value.trim() : '';
-    if (!text) return '';
-    return `<p style="margin:12px 0 0;color:#222;font-family:Arial,sans-serif;font-size:13px;">${escapeHtml(text).replace(/\n/g, '<br>')}</p>`;
+    const html = el ? getFieldRawValue(el).trim() : '';
+    if (!html) return '';
+    return `<p style="margin:12px 0 0;color:#222;font-family:Arial,sans-serif;font-size:13px;">${html}</p>`;
   }
 
   // ── Mail : type "Projet" (colonnes Forfait / TMA) ──────────
@@ -1877,7 +2047,7 @@
   // ── Capture/restauration de l'état complet du calculateur (pour reprendre une demande plus tard) ──
   function captureFullState() {
     const fields = {};
-    document.querySelectorAll('#chiffrage-body input, #chiffrage-body textarea').forEach(el => { fields[el.id] = el.value; });
+    document.querySelectorAll('#chiffrage-body input, #chiffrage-body textarea, #chiffrage-body [contenteditable]').forEach(el => { fields[el.id] = getFieldRawValue(el); });
     return {
       currentType,
       atelierTouched,
@@ -1908,7 +2078,7 @@
     d.type = currentType || '';
     d.etat_json = currentType ? JSON.stringify(captureFullState()) : '';
     d.mail_html = mailEl ? mailEl.innerHTML : '';
-    d.commentaire = commentEl ? commentEl.value : '';
+    d.commentaire = commentEl ? getFieldRawValue(commentEl) : '';
     d.total_forfait = readCurrentTotal('forfait');
     d.total_tma = readCurrentTotal('tma');
     d.date_maj = new Date().toISOString();
@@ -1919,7 +2089,7 @@
     // Le commentaire n'est pas propre à un type de chiffrage : on le restaure toujours,
     // même si aucun calculateur n'a encore été rempli pour cette demande.
     const commentEl = document.getElementById('chiffrage-comment');
-    if (commentEl) commentEl.value = d.commentaire || '';
+    if (commentEl) setFieldRawValue(commentEl, d.commentaire || '');
 
     let state = null;
     if (d.etat_json) {
@@ -1947,7 +2117,7 @@
     const applyFields = () => {
       Object.keys(state.fields || {}).forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.value = state.fields[id];
+        if (el) setFieldRawValue(el, state.fields[id]);
       });
     };
 
