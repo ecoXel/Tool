@@ -18,6 +18,14 @@
     --text-dim: #83a0c4;   /* contraste augmenté (était #4a6080) */
     --text-mid: #aecaf0;   /* contraste augmenté (était #7a9abf) */
     --green: #4ade80;
+
+    /* ── Palette des statuts (badges du tableau de suivi + filtre) ── */
+    --status-new: #4a9eff;      /* Demande / Révision : bleu accent */
+    --status-waiting: #f5a623;  /* Attente / Transmis : orange, en attente de retour */
+    --status-progress: #9b6bff; /* En cours / Dev : violet, en cours de traitement */
+    --status-done: #34d399;     /* Validé : vert, terminé positivement */
+    --status-closed: #f87171;   /* Refus : rouge, terminé négativement */
+    --status-abandoned: #6b7280;/* Abandonné : gris, clos sans suite */
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -42,14 +50,33 @@
     flex-wrap: wrap;
   }
 
-  h1 {
+  /* ── Titre : look "prompt de terminal", avec curseur clignotant ── */
+  .brand {
+    display: flex;
+    align-items: baseline;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--accent);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
+    font-size: 16px;
+    letter-spacing: 0.02em;
   }
+  .brand-name { color: var(--text); font-weight: 700; }
+  .brand-dot { color: var(--accent); font-weight: 700; margin: 0 1px; }
+  .brand-suite {
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-left: 2px;
+  }
+  .brand-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    margin-left: 6px;
+    background: var(--accent);
+    animation: brand-blink 1.1s steps(1) infinite;
+  }
+  @keyframes brand-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 
   .btn-reset {
     background: transparent;
@@ -137,8 +164,6 @@
   }
   .file-status-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  .suivi-actions { margin-bottom: 16px; }
-
   .new-demande-form {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -184,7 +209,7 @@
     color: var(--text-dim);
   }
   .demandes-table tbody tr:last-child td { border-bottom: none; }
-  .demandes-table tbody tr:hover { background: var(--accent-glow); }
+  .demandes-table tbody tr:hover { background: var(--accent-glow); cursor: pointer; }
   .demande-cell { max-width: 320px; }
   .comment-flag {
     color: var(--text-mid);
@@ -197,6 +222,118 @@
     vertical-align: bottom;
   }
   .demande-actions { display: flex; gap: 6px; white-space: nowrap; }
+
+  /* ── Boutons icône (actions de ligne dans le tableau, "+" de la toolbar) ── */
+  .btn-icon {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-size: 14px;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    padding: 0;
+  }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+  .btn-icon-danger:hover { border-color: #f87171; color: #f87171; background: rgba(248,113,113,0.12); }
+  .btn-icon-primary {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .btn-icon-primary:hover { background: var(--accent); color: var(--bg); }
+
+  .suivi-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .toolbar-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+  .toolbar-spacer { flex: 1; }
+  .suivi-toolbar select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 8px;
+    outline: none;
+  }
+  .suivi-toolbar select:focus { border-color: var(--accent); }
+
+  /* ── Filtre statut : bouton + menu déroulant à cases à cocher (au lieu d'une rangée de puces qui prenait toute la largeur) ── */
+  .statut-filter-dropdown { position: relative; }
+  .statut-filter-toggle {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .statut-filter-toggle:hover, .statut-filter-toggle.open { border-color: var(--accent); color: var(--accent); }
+  .statut-filter-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    min-width: 190px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    padding: 6px;
+  }
+  .statut-filter-menu.hidden { display: none; }
+  .statut-filter-menu-actions {
+    display: flex;
+    gap: 10px;
+    padding: 2px 6px 6px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .statut-filter-menu-actions a {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .statut-filter-menu-actions a:hover { color: var(--accent); }
+  .statut-filter-menu label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--text-mid);
+    cursor: pointer;
+    padding: 5px 6px;
+    white-space: nowrap;
+  }
+  .statut-filter-menu label:hover { background: var(--accent-glow); color: var(--accent); }
+  .statut-filter-menu input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .statut-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .statut-dot.s-new { background: var(--status-new); }
+  .statut-dot.s-waiting { background: var(--status-waiting); }
+  .statut-dot.s-progress { background: var(--status-progress); }
+  .statut-dot.s-done { background: var(--status-done); }
+  .statut-dot.s-closed { background: var(--status-closed); }
+  .statut-dot.s-abandoned { background: var(--status-abandoned); }
   .empty-row { color: var(--text-dim); font-style: italic; text-align: center; }
 
   /* ── Barre de contexte demande (dans la vue calculateur) ── */
@@ -214,6 +351,7 @@
   .demande-context-info { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
   .demande-context-client { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
   .demande-context-req { font-size: 12px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; }
+  .demande-context-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim); white-space: nowrap; }
   .demande-context-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .demande-context-actions select {
     background: var(--bg);
@@ -224,6 +362,48 @@
     padding: 6px 8px;
     outline: none;
   }
+
+  /* ── Bloc "Demande initiale" affiché sous la barre de contexte, dans la vue calculateur ── */
+  .demande-detail-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    margin: -8px 0 16px;
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+  .demande-detail-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  /* white-space en pre-wrap seulement ici (pas sur le bloc parent) : posé plus haut, il aurait
+     aussi rendu visibles les retours à la ligne/indentation du code HTML entre les deux <div>
+     (label et texte), d'où le grand espace vide constaté entre eux. */
+  .demande-detail-text { white-space: pre-wrap; line-height: 1.5; }
+
+  /* ── Badge coloré pour le statut d'une demande (tableau de suivi) ── */
+  .statut-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .statut-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .statut-badge.s-new { color: var(--status-new); background: rgba(74,158,255,0.12); }
+  .statut-badge.s-waiting { color: var(--status-waiting); background: rgba(245,166,35,0.12); }
+  .statut-badge.s-progress { color: var(--status-progress); background: rgba(155,107,255,0.12); }
+  .statut-badge.s-done { color: var(--status-done); background: rgba(52,211,153,0.12); }
+  .statut-badge.s-closed { color: var(--status-closed); background: rgba(248,113,113,0.12); }
+  .statut-badge.s-abandoned { color: var(--status-abandoned); background: rgba(107,114,128,0.12); }
 
   /* ── Panneau principal ── */
   .main-panel {
@@ -422,6 +602,8 @@
     padding: 8px 10px;
     outline: none;
     transition: border-color 0.15s;
+    resize: vertical;
+    overflow-y: auto;
   }
   .richtext-input:focus { border-color: var(--accent); }
   .richtext-input:empty::before { content: attr(data-placeholder); color: var(--text-dim); font-style: italic; }
@@ -552,10 +734,10 @@
 <div class="container">
 
   <div class="top-bar">
-    <h1>// Chiffrage Docuware</h1>
+    <h1 class="brand"><span class="brand-name">Chiffrage</span><span class="brand-dot">.</span><span class="brand-suite">docuware</span><span class="brand-cursor"></span></h1>
     <div class="top-bar-actions">
       <button class="btn-nav" id="nav-suivi" onclick="showView('suivi')">📋 Suivi des demandes</button>
-      <button class="btn-reset" onclick="resetAll(); showView('chiffrage');">↺ Nouveau chiffrage</button>
+      <button class="btn-reset" onclick="resetAll(); showView('chiffrage');">🧮 Chiffrage</button>
     </div>
   </div>
 
@@ -573,12 +755,22 @@
       </div>
     </div>
 
-    <div class="suivi-actions">
-      <button class="btn-primary" onclick="openNewDemandeForm()">+ Nouvelle demande</button>
+    <div class="suivi-toolbar">
+      <select id="filter-client" onchange="onClientFilterChange()"></select>
+      <select id="filter-demandeur" onchange="onDemandeurFilterChange()"></select>
+      <div class="statut-filter-dropdown" id="statut-filter-dropdown">
+        <button type="button" class="statut-filter-toggle" id="statut-filter-toggle" onclick="toggleStatutFilterMenu()"></button>
+        <div class="statut-filter-menu hidden" id="statut-filter-menu"></div>
+      </div>
+      <span class="toolbar-spacer"></span>
+      <button class="btn-icon btn-icon-primary" onclick="openNewDemandeForm()" title="Nouvelle demande">+</button>
     </div>
 
     <div id="new-demande-form" class="new-demande-form hidden">
       <input type="text" id="nd-client" placeholder="Client">
+      <input type="text" id="nd-titre" placeholder="Titre (ce qui s'affichera dans le tableau)">
+      <input type="text" id="nd-demandeur" list="demandeur-suggestions" placeholder="Demandeur (commercial, contact interne...)">
+      <datalist id="demandeur-suggestions"></datalist>
       <textarea id="nd-demande" rows="2" placeholder="Demande initiale du client"></textarea>
       <div class="new-demande-form-actions">
         <button class="btn-primary" onclick="createDemande()">Créer et chiffrer</button>
@@ -588,7 +780,7 @@
 
     <table class="demandes-table">
       <thead>
-        <tr><th>Client</th><th>Demande</th><th>Statut</th><th>Total</th><th>Commentaire</th><th>Dernière maj</th><th></th></tr>
+        <tr><th>Client</th><th>Titre</th><th>Statut</th><th>Dernière maj</th><th>Total</th><th>Demandeur</th><th>Date demande</th><th>Commentaire</th><th></th></tr>
       </thead>
       <tbody id="demandes-tbody"></tbody>
     </table>
@@ -600,11 +792,28 @@
     <div class="demande-context-info">
       <span class="demande-context-client" id="ctx-client"></span>
       <span class="demande-context-req" id="ctx-demande"></span>
+      <span class="demande-context-meta" id="ctx-meta"></span>
     </div>
     <div class="demande-context-actions">
       <select id="ctx-statut" onchange="onStatutChange()"></select>
+      <button class="btn-action" onclick="openEditDemandeForm()">✏️ Modifier</button>
       <button class="btn-action" onclick="manualSave()">💾 Enregistrer</button>
       <button class="btn-action" onclick="backToSuivi()">◀ Retour au suivi</button>
+    </div>
+  </div>
+
+  <div id="demande-detail-block" class="demande-detail-block hidden">
+    <div class="demande-detail-label">Demande initiale</div>
+    <div class="demande-detail-text" id="demande-detail-text"></div>
+  </div>
+
+  <div id="edit-demande-form" class="new-demande-form hidden">
+    <input type="text" id="ed-client" placeholder="Client">
+    <input type="text" id="ed-titre" placeholder="Titre (ce qui s'affichera dans le tableau)">
+    <textarea id="ed-demande" rows="2" placeholder="Demande initiale du client"></textarea>
+    <div class="new-demande-form-actions">
+      <button class="btn-primary" onclick="saveEditDemandeForm()">Enregistrer les modifications</button>
+      <button class="btn-action" onclick="cancelEditDemandeForm()">Annuler</button>
     </div>
   </div>
 
@@ -714,6 +923,28 @@
 
   // ── Suivi des demandes de chiffrage ──────────────────────
   const STATUTS = ['Demande', 'Attente', 'En cours', 'Dev', 'Transmis', 'Révision', 'Validé', 'Refus', 'Abandonné'];
+  // Regroupement par couleur : bleu (nouveau/à revoir), violet (en cours de traitement),
+  // orange (en attente d'un retour), vert (validé), rouge (refusé), gris (abandonné).
+  const STATUT_BADGE_CLASS = {
+    'Demande': 's-new',
+    'Révision': 's-new',
+    'En cours': 's-progress',
+    'Dev': 's-progress',
+    'Attente': 's-waiting',
+    'Transmis': 's-waiting',
+    'Validé': 's-done',
+    'Refus': 's-closed',
+    'Abandonné': 's-abandoned',
+  };
+  function statutBadge(statut) {
+    if (!statut) return '';
+    const cls = STATUT_BADGE_CLASS[statut] || 's-new';
+    return `<span class="statut-badge ${cls}">${escapeHtml(statut)}</span>`;
+  }
+  function statutDot(statut) {
+    const cls = STATUT_BADGE_CLASS[statut] || 's-new';
+    return `<span class="statut-dot ${cls}"></span>`;
+  }
   let demandes = []; // liste travaillée en local (localStorage) : { id, client, demande, statut, date_creation, date_maj, type, total_forfait, total_tma, etat_json, mail_html }
   let currentDemandeId = null; // demande actuellement ouverte dans le calculateur, ou null en mode "chiffrage libre"
   let fileHandle = null; // FileSystemFileHandle du CSV connecté (navigateurs compatibles uniquement)
@@ -1012,6 +1243,10 @@
       block.classList.remove('hidden');
       btn.textContent = "Masquer l'aperçu mail";
       btn.classList.add('active-toggle');
+      // Afficher l'aperçu est le moment naturel où le chiffrage est "prêt" : on en profite pour
+      // enregistrer (en local) plutôt que de compter sur le clic explicite sur Enregistrer.
+      syncCurrentDemandeFromCalculator();
+      commitLocal();
     }
   }
 
@@ -1277,9 +1512,21 @@
   function hasAnyParam() {
     return val('in-install') + val('in-dev') + val('in-config') > 0;
   }
+  // Le HTML assaini (sanitizeRichHtml) ne produit jamais de <ul>/<ol>/<li> avec attributs —
+  // on peut donc les cibler par simple recherche/remplacement sans risque, pour resserrer les
+  // marges par défaut du navigateur/Outlook (qui sinon laissent de gros blancs autour des listes
+  // une fois collées dans le mail).
+  function styleListsForMail(html) {
+    if (!html) return html;
+    return html
+      .replace(/<ul>/g, '<ul style="margin:2px 0;padding-left:18px;">')
+      .replace(/<ol>/g, '<ol style="margin:2px 0;padding-left:18px;">')
+      .replace(/<li>/g, '<li style="margin:0;padding:0;">');
+  }
+
   function paramDetail() {
     const el = document.getElementById('in-detail');
-    return el ? getFieldRawValue(el).trim() : '';
+    return el ? styleListsForMail(getFieldRawValue(el).trim()) : '';
   }
 
   function update() {
@@ -1317,7 +1564,7 @@
     const connForfait = val('in-connecteurs-f');
     const connTMA = val('in-connecteurs-t');
     const connDetailEl = document.getElementById('in-connecteurs-detail');
-    const connDetail = connDetailEl ? getFieldRawValue(connDetailEl).trim() : '';
+    const connDetail = connDetailEl ? styleListsForMail(getFieldRawValue(connDetailEl).trim()) : '';
 
     const dForm = document.getElementById('d-formation');
     if (!dForm.querySelector('#in-sessions')) {
@@ -1482,10 +1729,18 @@
     buildMail(items, total, totalSansOption, hasOption);
   }
 
+  // Nom du client de la demande actuellement ouverte (vide si le calculateur est utilisé seul,
+  // sans être rattaché à une demande de suivi).
+  function currentClientName() {
+    if (!currentDemandeId) return '';
+    const d = demandes.find(x => x.id === currentDemandeId);
+    return d ? (d.client || '') : '';
+  }
+
   // ── Commentaire libre, repris tel quel dans le mail (les deux types) ──
   function mailCommentBlock() {
     const el = document.getElementById('chiffrage-comment');
-    const html = el ? getFieldRawValue(el).trim() : '';
+    const html = el ? styleListsForMail(getFieldRawValue(el).trim()) : '';
     if (!html) return '';
     return `<p style="margin:12px 0 0;color:#222;font-family:Arial,sans-serif;font-size:13px;">${html}</p>`;
   }
@@ -1519,10 +1774,14 @@
     });
 
     const totalGrand = totalForfait + totalTMA;
+    const clientName = currentClientName();
+    const ciDessous = 'Ci-dessous le détail du chiffrage' + (clientName ? ' pour le client ' + escapeHtml(clientName) : '') + '.';
 
     const html = `
       <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
-        Concernant le chiffrage demandé, le total est de <b>${fmt(totalGrand)}</b> (dont <b>${fmt(totalForfait)}</b> au forfait, et <b>${fmt(totalTMA)}</b> en TMA).
+        Bonjour,<br><br>
+        Concernant le chiffrage demandé, le total est de <b>${fmt(totalGrand)}</b> (dont <b>${fmt(totalForfait)}</b> au forfait, et <b>${fmt(totalTMA)}</b> en TMA).<br>
+        ${ciDessous}
       </p>
       <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
         <thead>
@@ -1611,10 +1870,14 @@
           <td style="padding:8px 0;color:#1a6abf;font-weight:bold;text-align:right;border-top:2px solid #1a6abf;">${totalStr}</td>
         </tr>`;
 
+    const clientName = currentClientName();
+    const ciDessous = 'Ci-dessous le détail du chiffrage' + (clientName ? ' pour le client ' + escapeHtml(clientName) : '') + '.';
+
     const html = `
       <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
+        Bonjour,<br><br>
         Concernant le chiffrage demandé, le total est de ${introTotal}.<br>
-        Ci-dessous le détail :
+        ${ciDessous}
       </p>
       <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
         <tbody>
@@ -1633,6 +1896,10 @@
   function copyMail() {
     const mailEl = document.getElementById('mail-render');
     if (!mailEl.innerHTML || mailEl.innerHTML.trim() === '') return;
+
+    // Copier le mail est, comme afficher l'aperçu, un point de passage naturel pour enregistrer.
+    syncCurrentDemandeFromCalculator();
+    commitLocal();
 
     const blob = new Blob([mailEl.innerHTML], { type: 'text/html' });
     const item = new ClipboardItem({ 'text/html': blob });
@@ -1655,7 +1922,7 @@
   // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
   // ═══════════════════════════════════════════════════════════
 
-  const CSV_COLUMNS = ['id', 'client', 'demande', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'commentaire'];
+  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'commentaire'];
 
   // ── Parsing/sérialisation CSV (RFC4180 simplifié : guillemets doublés, virgules et sauts de ligne dans les champs) ──
   function parseCSV(text) {
@@ -1930,20 +2197,119 @@
   }
 
   // ── Rendu de la liste ──
-  function truncateText(s, n) { return s && s.length > n ? s.slice(0, n - 1) + '…' : (s || ''); }
+  function truncateText(s, n) { return s && s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : (s || ''); }
+
   function formatDateFr(iso) {
     if (!iso) return '';
     const d = new Date(iso);
     if (isNaN(d)) return iso;
     return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   }
+  function formatDateOnlyFr(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString('fr-FR');
+  }
+
+  // ── Filtres du suivi : client/demandeur (menus déroulants) + statuts (cases à cocher).
+  // Par défaut les statuts "clos" (Validé/Refus/Abandonné) sont masqués pour ne pas noyer
+  // la liste des demandes encore actives.
+  const STATUTS_MASQUES_PAR_DEFAUT = ['Validé', 'Refus', 'Abandonné'];
+  let filterClient = '';
+  let filterDemandeur = '';
+  let filterStatuts = new Set(STATUTS.filter(s => !STATUTS_MASQUES_PAR_DEFAUT.includes(s)));
+
+  function onClientFilterChange() {
+    filterClient = document.getElementById('filter-client').value;
+    renderDemandesTable();
+  }
+  function onDemandeurFilterChange() {
+    filterDemandeur = document.getElementById('filter-demandeur').value;
+    renderDemandesTable();
+  }
+  function onStatutFilterChange(checkbox) {
+    if (checkbox.checked) filterStatuts.add(checkbox.value);
+    else filterStatuts.delete(checkbox.value);
+    updateStatutFilterToggleLabel();
+    renderDemandesTable();
+  }
+
+  function statutFilterAll(checked) {
+    filterStatuts = new Set(checked ? STATUTS : []);
+    document.querySelectorAll('#statut-filter-menu input[type="checkbox"]').forEach(cb => { cb.checked = checked; });
+    updateStatutFilterToggleLabel();
+    renderDemandesTable();
+  }
+
+  function updateStatutFilterToggleLabel() {
+    const btn = document.getElementById('statut-filter-toggle');
+    if (btn) btn.textContent = `Statuts (${filterStatuts.size}/${STATUTS.length}) ▾`;
+  }
+
+  function toggleStatutFilterMenu() {
+    const menu = document.getElementById('statut-filter-menu');
+    const btn = document.getElementById('statut-filter-toggle');
+    const opening = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !opening);
+    btn.classList.toggle('open', opening);
+  }
+  // Ferme le menu si on clique ailleurs sur la page (mais pas sur un clic à l'intérieur du menu
+  // ou sur le bouton lui-même, sinon il se refermerait avant même de pouvoir cocher une case).
+  document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('statut-filter-dropdown');
+    const menu = document.getElementById('statut-filter-menu');
+    if (!wrap || !menu || menu.classList.contains('hidden')) return;
+    if (!wrap.contains(e.target)) {
+      menu.classList.add('hidden');
+      document.getElementById('statut-filter-toggle').classList.remove('open');
+    }
+  });
+
+  function renderFilterControls() {
+    const selClient = document.getElementById('filter-client');
+    const selDemandeur = document.getElementById('filter-demandeur');
+    const menu = document.getElementById('statut-filter-menu');
+    if (!selClient || !selDemandeur || !menu) return;
+
+    const clients = Array.from(new Set(demandes.map(d => d.client).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    const demandeurs = Array.from(new Set(demandes.map(d => d.demandeur).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+
+    selClient.innerHTML = '<option value="">Tous les clients</option>' +
+      clients.map(c => `<option value="${escapeHtml(c)}"${c === filterClient ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    selDemandeur.innerHTML = '<option value="">Tous les demandeurs</option>' +
+      demandeurs.map(c => `<option value="${escapeHtml(c)}"${c === filterDemandeur ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+
+    // Le menu n'est construit qu'une fois : le reconstruire à chaque rendu effacerait l'état
+    // coché/décoché choisi par l'utilisatrice.
+    if (!menu.dataset.built) {
+      menu.innerHTML = `
+        <div class="statut-filter-menu-actions">
+          <a onclick="statutFilterAll(true)">Tout cocher</a>
+          <a onclick="statutFilterAll(false)">Tout décocher</a>
+        </div>` +
+        STATUTS.map(s =>
+          `<label><input type="checkbox" value="${escapeHtml(s)}" ${filterStatuts.has(s) ? 'checked' : ''} onchange="onStatutFilterChange(this)">${statutDot(s)}${escapeHtml(s)}</label>`
+        ).join('');
+      menu.dataset.built = '1';
+    }
+    updateStatutFilterToggleLabel();
+  }
 
   function renderDemandesTable() {
     const tbody = document.getElementById('demandes-tbody');
     if (!tbody) return;
-    const sorted = [...demandes].sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''));
+    renderFilterControls();
+
+    const filtered = demandes.filter(d =>
+      (!filterClient || d.client === filterClient) &&
+      (!filterDemandeur || d.demandeur === filterDemandeur) &&
+      filterStatuts.has(d.statut)
+    );
+    const sorted = filtered.sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''));
     if (!sorted.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Aucune demande pour l’instant.</td></tr>';
+      const msg = demandes.length ? 'Aucune demande ne correspond aux filtres.' : 'Aucune demande pour l’instant.';
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-row">${msg}</td></tr>`;
       return;
     }
     tbody.innerHTML = sorted.map(d => {
@@ -1952,26 +2318,53 @@
         ? `<span class="comment-flag" title="${escapeHtml(d.commentaire)}">💬 ${escapeHtml(truncateText(d.commentaire, 40))}</span>`
         : '';
       return `
-        <tr>
+        <tr ondblclick="if (!event.target.closest('.demande-actions')) openDemande('${d.id}')">
           <td>${escapeHtml(d.client || '')}</td>
-          <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(truncateText(d.demande || '', 70))}</td>
-          <td>${escapeHtml(d.statut || '')}</td>
-          <td>${totalTxt}</td>
-          <td>${commentTxt}</td>
+          <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
+          <td>${statutBadge(d.statut)}</td>
           <td>${formatDateFr(d.date_maj)}</td>
+          <td>${totalTxt}</td>
+          <td>${escapeHtml(d.demandeur || '')}</td>
+          <td>${formatDateOnlyFr(d.date_creation)}</td>
+          <td>${commentTxt}</td>
           <td class="demande-actions">
-            <button class="btn-action" onclick="openDemande('${d.id}')">Ouvrir</button>
-            <button class="btn-action" onclick="deleteDemande('${d.id}')">Supprimer</button>
+            <button class="btn-icon" onclick="openDemande('${d.id}')" title="Ouvrir dans le calculateur">🧮</button>
+            <button class="btn-icon" onclick="openDemandeForEdit('${d.id}')" title="Modifier client / titre / demande">✏️</button>
+            <button class="btn-icon btn-icon-danger" onclick="deleteDemande('${d.id}')" title="Supprimer">🗑️</button>
           </td>
         </tr>`;
     }).join('');
+  }
+
+  // ── Suggestions de "demandeur" : liste qui s'enrichit toute seule, en local uniquement
+  // (elle n'a pas besoin d'être partagée — c'est juste une aide à la saisie) ──
+  const DEMANDEURS_LS_KEY = 'chiffrage-demandeurs-v1';
+  function loadDemandeurSuggestions() {
+    try { return JSON.parse(localStorage.getItem(DEMANDEURS_LS_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveDemandeurSuggestion(name) {
+    if (!name) return;
+    const list = loadDemandeurSuggestions();
+    if (!list.includes(name)) {
+      list.push(name);
+      list.sort((a, b) => a.localeCompare(b));
+      try { localStorage.setItem(DEMANDEURS_LS_KEY, JSON.stringify(list)); } catch (e) {}
+    }
+  }
+  function renderDemandeurDatalist() {
+    const dl = document.getElementById('demandeur-suggestions');
+    if (!dl) return;
+    dl.innerHTML = loadDemandeurSuggestions().map(n => `<option value="${escapeHtml(n)}">`).join('');
   }
 
   // ── Formulaire nouvelle demande ──
   function openNewDemandeForm() {
     document.getElementById('new-demande-form').classList.remove('hidden');
     document.getElementById('nd-client').value = '';
+    document.getElementById('nd-titre').value = '';
     document.getElementById('nd-demande').value = '';
+    document.getElementById('nd-demandeur').value = '';
+    renderDemandeurDatalist();
     document.getElementById('nd-client').focus();
   }
   function cancelNewDemandeForm() {
@@ -1980,12 +2373,15 @@
 
   function createDemande() {
     const client = document.getElementById('nd-client').value.trim();
+    const titre = document.getElementById('nd-titre').value.trim();
     const demandeText = document.getElementById('nd-demande').value.trim();
+    const demandeur = document.getElementById('nd-demandeur').value.trim();
     if (!client) { alert('Renseigne au moins le nom du client.'); return; }
+    if (!titre) { alert('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.'); return; }
     const now = new Date().toISOString();
     const d = {
       id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-      client, demande: demandeText,
+      client, titre, demande: demandeText, demandeur,
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
       type: '', total_forfait: '', total_tma: '',
@@ -1993,6 +2389,7 @@
     };
     demandes.push(d);
     dirtyDemandeIds.add(d.id);
+    saveDemandeurSuggestion(demandeur);
     cancelNewDemandeForm();
     commitLocal();
     openDemande(d.id);
@@ -2011,12 +2408,63 @@
   function showDemandeContextBar(d) {
     document.getElementById('demande-context').classList.remove('hidden');
     document.getElementById('ctx-client').textContent = d.client || '(sans nom)';
-    document.getElementById('ctx-demande').textContent = d.demande || '';
+    const ctxDemandeEl = document.getElementById('ctx-demande');
+    ctxDemandeEl.textContent = d.titre || d.demande || '';
+    ctxDemandeEl.title = d.demande || '';
+    const metaParts = [];
+    if (d.demandeur) metaParts.push('Demandeur : ' + d.demandeur);
+    if (d.date_creation) metaParts.push('créée le ' + formatDateOnlyFr(d.date_creation));
+    document.getElementById('ctx-meta').textContent = metaParts.join(' · ');
     const sel = document.getElementById('ctx-statut');
     sel.innerHTML = STATUTS.map(s => `<option value="${escapeHtml(s)}"${s === d.statut ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
+
+    // Bloc détaillé sous la barre : affiche le texte complet de la demande initiale (la ligne
+    // du dessus, elle, reste au titre court pour rester compacte).
+    const detailBlock = document.getElementById('demande-detail-block');
+    const detailText = document.getElementById('demande-detail-text');
+    if (d.demande) {
+      detailText.textContent = d.demande;
+      detailBlock.classList.remove('hidden');
+    } else {
+      detailBlock.classList.add('hidden');
+    }
   }
   function hideDemandeContextBar() {
     document.getElementById('demande-context').classList.add('hidden');
+    document.getElementById('demande-detail-block').classList.add('hidden');
+  }
+
+  // ── Modifier une demande existante (client / titre / texte de la demande) ──
+  function openEditDemandeForm() {
+    if (!currentDemandeId) return;
+    const d = demandes.find(x => x.id === currentDemandeId);
+    if (!d) return;
+    document.getElementById('ed-client').value = d.client || '';
+    document.getElementById('ed-titre').value = d.titre || '';
+    document.getElementById('ed-demande').value = d.demande || '';
+    document.getElementById('edit-demande-form').classList.remove('hidden');
+    document.getElementById('ed-client').focus();
+  }
+  function cancelEditDemandeForm() {
+    document.getElementById('edit-demande-form').classList.add('hidden');
+  }
+  function saveEditDemandeForm() {
+    if (!currentDemandeId) return;
+    const d = demandes.find(x => x.id === currentDemandeId);
+    if (!d) return;
+    const client = document.getElementById('ed-client').value.trim();
+    const titre = document.getElementById('ed-titre').value.trim();
+    const demandeText = document.getElementById('ed-demande').value.trim();
+    if (!client) { alert('Renseigne au moins le nom du client.'); return; }
+    if (!titre) { alert('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.'); return; }
+    d.client = client;
+    d.titre = titre;
+    d.demande = demandeText;
+    d.date_maj = new Date().toISOString();
+    dirtyDemandeIds.add(d.id);
+    commitLocal();
+    showDemandeContextBar(d); // rafraîchit l'affichage (client/titre) dans la barre de contexte
+    document.getElementById('edit-demande-form').classList.add('hidden');
   }
 
   function onStatutChange() {
@@ -2041,6 +2489,7 @@
     commitLocal();
     currentDemandeId = null;
     hideDemandeContextBar();
+    cancelEditDemandeForm();
     showView('suivi');
   }
 
@@ -2138,8 +2587,16 @@
     currentDemandeId = id;
     showView('chiffrage');
     resetCalculatorUI();
+    cancelEditDemandeForm();
     showDemandeContextBar(d);
     loadDemandeIntoCalculatorState(d);
+  }
+
+  // Depuis le tableau de suivi : ouvre directement la demande avec le formulaire de modification
+  // affiché, pour ne pas avoir à cliquer une seconde fois sur "Modifier" une fois dedans.
+  function openDemandeForEdit(id) {
+    openDemande(id);
+    openEditDemandeForm();
   }
 
   // ── Initialisation au chargement de la page ──
