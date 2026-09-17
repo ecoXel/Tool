@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chiffrage Docuware</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwYTBmMWEiLz4KICA8cmVjdCB4PSIxLjUiIHk9IjEuNSIgd2lkdGg9IjYxIiBoZWlnaHQ9IjYxIiByeD0iMTIuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMWUyZDQ1IiBzdHJva2Utd2lkdGg9IjMiLz4KICA8dGV4dCB4PSIxMCIgeT0iNDUiIGZvbnQtZmFtaWx5PSJJQk0gUGxleCBNb25vLCBDb25zb2xhcywgbW9ub3NwYWNlIiBmb250LXNpemU9IjM0IiBmb250LXdlaWdodD0iNjAwIiBmaWxsPSIjNGE5ZWZmIj5DPC90ZXh0PgogIDxyZWN0IHg9IjQyIiB5PSIyNyIgd2lkdGg9IjExIiBoZWlnaHQ9IjE3IiBmaWxsPSIjNGE5ZWZmIi8+Cjwvc3ZnPgo=">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
 
@@ -2215,7 +2216,7 @@
   // ── Filtres du suivi : client/demandeur (menus déroulants) + statuts (cases à cocher).
   // Par défaut les statuts "clos" (Validé/Refus/Abandonné) sont masqués pour ne pas noyer
   // la liste des demandes encore actives.
-  const STATUTS_MASQUES_PAR_DEFAUT = ['Validé', 'Refus', 'Abandonné'];
+  const STATUTS_MASQUES_PAR_DEFAUT = ['Transmis', 'Validé', 'Refus', 'Abandonné'];
   let filterClient = '';
   let filterDemandeur = '';
   let filterStatuts = new Set(STATUTS.filter(s => !STATUTS_MASQUES_PAR_DEFAUT.includes(s)));
