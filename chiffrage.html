@@ -78,6 +78,16 @@
     animation: brand-blink 1.1s steps(1) infinite;
   }
   @keyframes brand-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  .brand-group { display: flex; align-items: center; gap: 8px; }
+  .sync-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; padding: 0 6px;
+    border-radius: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
+    cursor: pointer; user-select: none;
+  }
+  .sync-badge.sync-ok { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+  .sync-badge.sync-pending { background: rgba(245, 166, 35, 0.18); color: var(--status-waiting); }
+  .sync-badge.sync-local { background: rgba(131, 160, 196, 0.12); color: var(--text-dim); }
 
   .btn-reset {
     background: transparent;
@@ -209,8 +219,19 @@
     text-transform: uppercase;
     color: var(--text-dim);
   }
+  .demandes-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  .demandes-table th.sortable:hover { color: var(--text); }
+  .demandes-table .sort-arrow { margin-left: 4px; font-size: 8px; color: var(--accent); }
   .demandes-table tbody tr:last-child td { border-bottom: none; }
   .demandes-table tbody tr:hover { background: var(--accent-glow); cursor: pointer; }
+  .demandes-table tfoot td {
+    font-weight: 700;
+    color: var(--text);
+    border-bottom: none;
+    border-top: 2px solid var(--border);
+    background: var(--surface);
+  }
+  .demandes-table tfoot .foot-label { color: var(--text-dim); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
   .demande-cell { max-width: 320px; }
   .comment-flag {
     color: var(--text-mid);
@@ -273,6 +294,18 @@
     outline: none;
   }
   .suivi-toolbar select:focus { border-color: var(--accent); }
+  .search-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+    min-width: 220px;
+  }
+  .search-input::placeholder { color: var(--text-dim); }
+  .search-input:focus { border-color: var(--accent); }
 
   /* ── Filtre statut : bouton + menu déroulant à cases à cocher (au lieu d'une rangée de puces qui prenait toute la largeur) ── */
   .statut-filter-dropdown { position: relative; }
@@ -735,7 +768,10 @@
 <div class="container">
 
   <div class="top-bar">
-    <h1 class="brand"><span class="brand-name">Chiffrage</span><span class="brand-dot">.</span><span class="brand-suite">docuware</span><span class="brand-cursor"></span></h1>
+    <div class="brand-group">
+      <h1 class="brand"><span class="brand-name">Chiffrage</span><span class="brand-dot">.</span><span class="brand-suite">docuware</span><span class="brand-cursor"></span></h1>
+      <span class="sync-badge" id="sync-badge" onclick="showView('suivi')" title=""></span>
+    </div>
     <div class="top-bar-actions">
       <button class="btn-nav" id="nav-suivi" onclick="showView('suivi')">📋 Suivi des demandes</button>
       <button class="btn-reset" onclick="resetAll(); showView('chiffrage');">🧮 Chiffrage</button>
@@ -757,6 +793,7 @@
     </div>
 
     <div class="suivi-toolbar">
+      <input type="text" id="filter-search" class="search-input" placeholder="🔎 Rechercher (titre, demande)…" oninput="onSearchInput()">
       <select id="filter-client" onchange="onClientFilterChange()"></select>
       <select id="filter-demandeur" onchange="onDemandeurFilterChange()"></select>
       <div class="statut-filter-dropdown" id="statut-filter-dropdown">
@@ -781,9 +818,21 @@
 
     <table class="demandes-table">
       <thead>
-        <tr><th>Client</th><th>Titre</th><th>Statut</th><th>Dernière maj</th><th>Total</th><th>Demandeur</th><th>Date demande</th><th>Commentaire</th><th></th></tr>
+        <tr>
+          <th class="sortable" onclick="onSortColumnClick('client')">Client<span class="sort-arrow" data-col="client"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('titre')">Titre<span class="sort-arrow" data-col="titre"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('statut')">Statut<span class="sort-arrow" data-col="statut"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('date_maj')">Dernière maj<span class="sort-arrow" data-col="date_maj"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('total_forfait')">Forfait<span class="sort-arrow" data-col="total_forfait"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('total_tma')">TMA<span class="sort-arrow" data-col="total_tma"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('demandeur')">Demandeur<span class="sort-arrow" data-col="demandeur"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('date_creation')">Date demande<span class="sort-arrow" data-col="date_creation"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('commentaire')">Commentaire<span class="sort-arrow" data-col="commentaire"></span></th>
+          <th></th>
+        </tr>
       </thead>
       <tbody id="demandes-tbody"></tbody>
+      <tfoot id="demandes-tfoot"></tfoot>
     </table>
   </div>
 
@@ -945,6 +994,25 @@
   function statutDot(statut) {
     const cls = STATUT_BADGE_CLASS[statut] || 's-new';
     return `<span class="statut-dot ${cls}"></span>`;
+  }
+  function updateSyncBadge() {
+    const el = document.getElementById('sync-badge');
+    if (!el) return;
+    const pending = dirtyDemandeIds.size + deletedDemandeIds.size;
+    el.classList.remove('sync-ok', 'sync-pending', 'sync-local');
+    if (pending > 0) {
+      el.classList.add('sync-pending');
+      el.textContent = String(pending);
+      el.title = pending + (pending > 1 ? ' changements non enregistrés' : ' changement non enregistré') + ' dans le fichier partagé — pense à "Enregistrer" depuis le Suivi.';
+    } else if (fileHandle) {
+      el.classList.add('sync-ok');
+      el.textContent = '✓';
+      el.title = 'À jour avec le fichier partagé.';
+    } else {
+      el.classList.add('sync-local');
+      el.textContent = '○';
+      el.title = 'Travail local uniquement — connecte un fichier CSV partagé depuis le Suivi pour synchroniser avec l’équipe.';
+    }
   }
   let demandes = []; // liste travaillée en local (localStorage) : { id, client, demande, statut, date_creation, date_maj, type, total_forfait, total_tma, etat_json, mail_html }
   let currentDemandeId = null; // demande actuellement ouverte dans le calculateur, ou null en mode "chiffrage libre"
@@ -2220,6 +2288,7 @@
   let filterClient = '';
   let filterDemandeur = '';
   let filterStatuts = new Set(STATUTS.filter(s => !STATUTS_MASQUES_PAR_DEFAUT.includes(s)));
+  let searchQuery = '';
 
   function onClientFilterChange() {
     filterClient = document.getElementById('filter-client').value;
@@ -2234,6 +2303,57 @@
     else filterStatuts.delete(checkbox.value);
     updateStatutFilterToggleLabel();
     renderDemandesTable();
+  }
+  function onSearchInput() {
+    searchQuery = document.getElementById('filter-search').value;
+    renderDemandesTable();
+  }
+  // Recherche insensible à la casse et aux accents (titre + demande uniquement).
+  function normalizeSearch(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+  function matchesSearch(d, q) {
+    const nq = normalizeSearch(q);
+    if (!nq) return true;
+    return normalizeSearch(d.titre).includes(nq) || normalizeSearch(d.demande).includes(nq);
+  }
+
+  // ── Tri du tableau : clic sur un en-tête = trie par cette colonne, re-clic = inverse le sens.
+  // Par défaut : date de la demande, du plus ancien au plus récent (traiter les demandes dans l'ordre d'arrivée).
+  let sortColumn = 'date_creation';
+  let sortDir = 'asc';
+  function onSortColumnClick(col) {
+    if (sortColumn === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortColumn = col; sortDir = 'asc'; }
+    renderDemandesTable();
+  }
+  function parseTotalNum(v) {
+    const n = parseFloat(String(v || '').replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+  }
+  function sortValue(d, col) {
+    switch (col) {
+      case 'client': return (d.client || '').toLowerCase();
+      case 'titre': return (d.titre || truncateText(d.demande || '', 60) || '').toLowerCase();
+      case 'statut': return STATUTS.indexOf(d.statut); // ordre du workflow, pas alphabétique
+      case 'date_maj': return d.date_maj || '';
+      case 'total_forfait': return parseTotalNum(d.total_forfait);
+      case 'total_tma': return parseTotalNum(d.total_tma);
+      case 'demandeur': return (d.demandeur || '').toLowerCase();
+      case 'date_creation': return d.date_creation || '';
+      case 'commentaire': return (d.commentaire || '').toLowerCase();
+      default: return '';
+    }
+  }
+  function compareDemandes(a, b, col, dir) {
+    const va = sortValue(a, col), vb = sortValue(b, col);
+    const cmp = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'fr');
+    return dir === 'asc' ? cmp : -cmp;
+  }
+  function renderSortIndicators() {
+    document.querySelectorAll('.demandes-table .sort-arrow').forEach(el => {
+      el.textContent = el.dataset.col === sortColumn ? (sortDir === 'asc' ? '▲' : '▼') : '';
+    });
   }
 
   function statutFilterAll(checked) {
@@ -2299,22 +2419,28 @@
 
   function renderDemandesTable() {
     const tbody = document.getElementById('demandes-tbody');
+    const tfoot = document.getElementById('demandes-tfoot');
     if (!tbody) return;
     renderFilterControls();
+    updateSyncBadge();
 
     const filtered = demandes.filter(d =>
       (!filterClient || d.client === filterClient) &&
       (!filterDemandeur || d.demandeur === filterDemandeur) &&
-      filterStatuts.has(d.statut)
+      filterStatuts.has(d.statut) &&
+      matchesSearch(d, searchQuery)
     );
-    const sorted = filtered.sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''));
+    const sorted = filtered.sort((a, b) => compareDemandes(a, b, sortColumn, sortDir));
+    renderSortIndicators();
     if (!sorted.length) {
       const msg = demandes.length ? 'Aucune demande ne correspond aux filtres.' : 'Aucune demande pour l’instant.';
-      tbody.innerHTML = `<tr><td colspan="9" class="empty-row">${msg}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-row">${msg}</td></tr>`;
+      if (tfoot) tfoot.innerHTML = '';
       return;
     }
     tbody.innerHTML = sorted.map(d => {
-      const totalTxt = d.total_forfait ? escapeHtml(d.total_forfait) + (d.total_tma ? ' + ' + escapeHtml(d.total_tma) + ' TMA' : '') : '—';
+      const forfaitTxt = d.total_forfait ? escapeHtml(d.total_forfait) : '—';
+      const tmaTxt = d.total_tma ? escapeHtml(d.total_tma) : '—';
       const commentTxt = d.commentaire
         ? `<span class="comment-flag" title="${escapeHtml(d.commentaire)}">💬 ${escapeHtml(truncateText(d.commentaire, 40))}</span>`
         : '';
@@ -2324,7 +2450,8 @@
           <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
           <td>${statutBadge(d.statut)}</td>
           <td>${formatDateFr(d.date_maj)}</td>
-          <td>${totalTxt}</td>
+          <td>${forfaitTxt}</td>
+          <td>${tmaTxt}</td>
           <td>${escapeHtml(d.demandeur || '')}</td>
           <td>${formatDateOnlyFr(d.date_creation)}</td>
           <td>${commentTxt}</td>
@@ -2335,6 +2462,18 @@
           </td>
         </tr>`;
     }).join('');
+
+    if (tfoot) {
+      const sumForfait = sorted.reduce((acc, d) => acc + parseTotalNum(d.total_forfait), 0);
+      const sumTMA = sorted.reduce((acc, d) => acc + parseTotalNum(d.total_tma), 0);
+      tfoot.innerHTML = `
+        <tr>
+          <td colspan="4" class="foot-label">Total (${sorted.length} demande${sorted.length > 1 ? 's' : ''} affichée${sorted.length > 1 ? 's' : ''})</td>
+          <td>${fmt(sumForfait)}</td>
+          <td>${fmt(sumTMA)}</td>
+          <td colspan="4"></td>
+        </tr>`;
+    }
   }
 
   // ── Suggestions de "demandeur" : liste qui s'enrichit toute seule, en local uniquement
