@@ -984,6 +984,7 @@
 <script>
   // ── État global ─────────────────────────────────────────
   let currentType = null;
+  let currentMailRecapText = ''; // version compacte du mail (une ligne par poste), pour la colonne CSV mail_texte
   let atelierTouched = false;
   let paramRevealed = false; // true une fois le paramétrage rempli -> tableau complet affiché
   let manualTouched = new Set(); // ids des cases calculées que l'utilisateur a modifiées à la main
@@ -1842,7 +1843,44 @@
   }
 
   // ── Mail : type "Projet" (colonnes Forfait / TMA) ──────────
+  // ── Récap compact du mail (une ligne par poste : "Label : forfait + TMA : x"), pour la colonne
+  // CSV mail_texte. On ne garde une description que si c'est elle-même une liste à puces (du
+  // contenu propre à CE chiffrage, comme le détail du Paramétrage) : une description en prose
+  // n'est là que pour expliquer le poste dans le mail, elle n'apporte rien dans un récap. ──
+  function isListDesc(desc) { return /<li[\s>]/i.test(desc || ''); }
+  function recapDescBlock(desc) { return isListDesc(desc) ? htmlToPlainText(desc) : ''; }
+  function buildRecapSplit(items, totalForfait, totalTMA) {
+    const lines = [];
+    items.forEach(it => {
+      if (it.isNote || (it.forfait === 0 && it.tma === 0)) return;
+      let line = it.label + ' : ' + fmtNum(it.forfait);
+      if (it.tma > 0) line += ' + TMA : ' + fmtNum(it.tma);
+      lines.push(line);
+      const descBlock = recapDescBlock(it.desc);
+      if (descBlock) lines.push(descBlock, '');
+    });
+    lines.push('Total : ' + fmtNum(totalForfait) + ' + ' + fmtNum(totalTMA) + ' = ' + fmt(totalForfait + totalTMA));
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+  function buildRecapSingle(items, total, totalSansOption, hasOption) {
+    const lines = [];
+    items.forEach(it => {
+      if (it.isNote || it.val === 0) return;
+      lines.push(it.label + (it.option ? ' (option)' : '') + ' : ' + fmtNum(it.val));
+      const descBlock = recapDescBlock(it.desc);
+      if (descBlock) lines.push(descBlock, '');
+    });
+    if (hasOption && totalSansOption !== total) {
+      lines.push('Total hors formation : ' + fmt(totalSansOption));
+      lines.push('Total avec formation : ' + fmt(total));
+    } else {
+      lines.push('Total : ' + fmt(total));
+    }
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
   function buildMailSplit(items, totalForfait, totalTMA) {
+    currentMailRecapText = buildRecapSplit(items, totalForfait, totalTMA);
     let rows = '';
     items.forEach(it => {
       if (it.isNote) {
@@ -1918,6 +1956,7 @@
 
   // ── Mail : type "Préconfiguré" (colonne unique) ──
   function buildMail(items, total, totalSansOption, hasOption) {
+    currentMailRecapText = buildRecapSingle(items, total, totalSansOption, hasOption);
     const totalStr = fmt(total);
     const totalSansStr = fmt(totalSansOption);
 
@@ -2135,11 +2174,13 @@
     return v;
   }
 
-  // Les colonnes "_texte" ne sont jamais lues depuis un CSV existant : elles sont toujours
-  // recalculées à partir du HTML au moment d'écrire le fichier, pour que même une demande jamais
-  // rouverte cette session ait quand même sa version texte à jour dans l'export.
+  // commentaire_texte n'est jamais lu depuis un CSV existant : il est toujours recalculé à partir
+  // du HTML au moment d'écrire le fichier, pour que même une demande jamais rouverte cette session
+  // ait quand même sa version texte à jour dans l'export. mail_texte, lui, ne peut pas être
+  // recalculé de la même façon (il faut la distinction poste/description-liste, perdue une fois
+  // le mail rendu en HTML) : il est calculé une fois pour toutes à chaque recalcul du chiffrage et
+  // stocké tel quel sur la demande, comme mail_html.
   function getCsvValue(d, col) {
-    if (col === 'mail_texte') return htmlToPlainText(d.mail_html);
     if (col === 'commentaire_texte') return htmlToPlainText(d.commentaire);
     return d[col];
   }
@@ -2652,7 +2693,7 @@
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
       type: '', total_forfait: '', total_tma: '',
-      etat_json: '', mail_html: ''
+      etat_json: '', mail_html: '', mail_texte: ''
     };
     demandes.push(d);
     dirtyDemandeIds.add(d.id);
@@ -2798,6 +2839,10 @@
     d.type = currentType || '';
     d.etat_json = currentType ? JSON.stringify(captureFullState()) : '';
     d.mail_html = mailEl ? mailEl.innerHTML : '';
+    // currentMailRecapText est calculé par buildMail/buildMailSplit à chaque recalcul du chiffrage
+    // (donc déjà à jour ici) ; on ne le régénère pas depuis mail_html, qui a perdu la distinction
+    // entre description générique (à ignorer) et description-liste (à garder).
+    d.mail_texte = mailEl && mailEl.innerHTML ? currentMailRecapText : '';
     d.commentaire = commentEl ? getFieldRawValue(commentEl) : '';
     d.total_forfait = readCurrentTotal('forfait');
     d.total_tma = readCurrentTotal('tma');
