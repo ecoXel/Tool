@@ -2058,7 +2058,51 @@
   // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
   // ═══════════════════════════════════════════════════════════
 
-  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'commentaire'];
+  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'mail_texte', 'commentaire', 'commentaire_texte'];
+
+  // ── Conversion HTML → texte brut lisible, pour les colonnes CSV destinées à être ouvertes
+  // dans Excel (le mail et le commentaire sont stockés en HTML pour l'app, illisibles tels quels
+  // dans un tableur). Générique : ne connaît rien de la structure précise du mail, juste des
+  // règles de mise en page basées sur les balises (listes à puces, sauts de ligne, cellules de
+  // tableau séparées par " | "). Le formatage (gras, souligné...) est perdu : un tableur ne peut
+  // de toute façon pas l'afficher dans une cellule.
+  function htmlToPlainText(html) {
+    if (!html) return '';
+    const root = document.createElement('div');
+    root.innerHTML = html;
+
+    // Le HTML source est un template indenté sur plusieurs lignes (pour rester lisible dans le
+    // code) : ces sauts de ligne/indentations n'ont aucun sens pour l'affichage et se retrouveraient
+    // tels quels dans .textContent. On les neutralise via des repères qui ne sont jamais générés
+    // par une simple mise en forme du template, pour pouvoir tout écraser en espaces ensuite et ne
+    // réintroduire que les sauts de ligne qu'on a choisis nous-mêmes.
+    const NL = '\u0001', SEP = '\u0002', BULLET = '\u0003';
+
+    // À l'intérieur d'une cellule de tableau, un <br> reste un espace (sinon chaque ligne du
+    // tableau de chiffrage exploserait sur 4-5 lignes dans la cellule Excel).
+    root.querySelectorAll('td, th').forEach(cell => {
+      cell.querySelectorAll('br').forEach(br => br.replaceWith(' '));
+    });
+    root.querySelectorAll('br').forEach(br => br.replaceWith(NL));
+    root.querySelectorAll('li').forEach(li => { li.prepend(BULLET); li.append(NL); });
+    root.querySelectorAll('td, th').forEach(cell => cell.append(SEP));
+    root.querySelectorAll('tr').forEach(tr => tr.append(NL));
+    // Une liste démarre toujours sur sa propre ligne, même collée à du texte juste avant (pas de <br> entre les deux dans le HTML source).
+    root.querySelectorAll('ul, ol').forEach(el => el.before(NL));
+    root.querySelectorAll('p, div, table, ul, ol').forEach(el => el.append(NL));
+
+    let text = (root.textContent || '').replace(/\s+/g, ' ');
+    text = text
+      .replace(new RegExp(SEP + ' ?' + NL, 'g'), NL) // pas de séparateur en trop en fin de ligne de tableau
+      .replace(new RegExp(SEP, 'g'), ' | ')
+      .replace(new RegExp(NL, 'g'), '\n')
+      .replace(new RegExp(BULLET, 'g'), '• ');
+    return text
+      .replace(/[ \t]*\n[ \t]*/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/ {2,}/g, ' ')
+      .trim();
+  }
 
   // ── Parsing/sérialisation CSV (RFC4180 simplifié : guillemets doublés, virgules et sauts de ligne dans les champs) ──
   function parseCSV(text) {
@@ -2091,9 +2135,18 @@
     return v;
   }
 
+  // Les colonnes "_texte" ne sont jamais lues depuis un CSV existant : elles sont toujours
+  // recalculées à partir du HTML au moment d'écrire le fichier, pour que même une demande jamais
+  // rouverte cette session ait quand même sa version texte à jour dans l'export.
+  function getCsvValue(d, col) {
+    if (col === 'mail_texte') return htmlToPlainText(d.mail_html);
+    if (col === 'commentaire_texte') return htmlToPlainText(d.commentaire);
+    return d[col];
+  }
+
   function serializeCSV(rows) {
     const lines = [CSV_COLUMNS.join(',')];
-    rows.forEach(d => lines.push(CSV_COLUMNS.map(c => csvField(d[c])).join(',')));
+    rows.forEach(d => lines.push(CSV_COLUMNS.map(c => csvField(getCsvValue(d, c))).join(',')));
     return '﻿' + lines.join('\r\n') + '\r\n';
   }
 
@@ -2509,8 +2562,11 @@
     tbody.innerHTML = sorted.map(d => {
       const forfaitTxt = d.total_forfait ? escapeHtml(d.total_forfait) : '—';
       const tmaTxt = d.total_tma ? escapeHtml(d.total_tma) : '—';
-      const commentTxt = d.commentaire
-        ? `<span class="comment-flag" title="${escapeHtml(d.commentaire)}">💬 ${escapeHtml(truncateText(d.commentaire, 40))}</span>`
+      // Le commentaire est stocké en HTML (mise en forme riche) : on l'affiche ici en texte brut,
+      // sinon la puce/l'infobulle montrerait les balises telles quelles.
+      const commentPlain = d.commentaire ? htmlToPlainText(d.commentaire) : '';
+      const commentTxt = commentPlain
+        ? `<span class="comment-flag" title="${escapeHtml(commentPlain)}">💬 ${escapeHtml(truncateText(commentPlain.replace(/\s+/g, ' ').trim(), 40))}</span>`
         : '';
       return `
         <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell')) openDemande('${d.id}')">
