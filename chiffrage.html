@@ -386,6 +386,18 @@
   .demande-context-client { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
   .demande-context-req { font-size: 12px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; }
   .demande-context-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+  .jira-link {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+  .jira-link:hover { border-color: var(--accent); background: var(--accent-glow); }
   .demande-context-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .demande-context-actions select {
     background: var(--bg);
@@ -809,6 +821,7 @@
       <input type="text" id="nd-titre" placeholder="Titre (ce qui s'affichera dans le tableau)">
       <input type="text" id="nd-demandeur" list="demandeur-suggestions" placeholder="Demandeur (commercial, contact interne...)">
       <datalist id="demandeur-suggestions"></datalist>
+      <input type="text" id="nd-jira" placeholder="Ticket Jira (ex : INTE-4715)">
       <textarea id="nd-demande" rows="2" placeholder="Demande initiale du client"></textarea>
       <div class="new-demande-form-actions">
         <button class="btn-primary" onclick="createDemande()">Créer et chiffrer</button>
@@ -826,6 +839,7 @@
           <th class="sortable" onclick="onSortColumnClick('total_forfait')">Forfait<span class="sort-arrow" data-col="total_forfait"></span></th>
           <th class="sortable" onclick="onSortColumnClick('total_tma')">TMA<span class="sort-arrow" data-col="total_tma"></span></th>
           <th class="sortable" onclick="onSortColumnClick('demandeur')">Demandeur<span class="sort-arrow" data-col="demandeur"></span></th>
+          <th class="sortable" onclick="onSortColumnClick('jira')">Jira<span class="sort-arrow" data-col="jira"></span></th>
           <th class="sortable" onclick="onSortColumnClick('date_creation')">Date demande<span class="sort-arrow" data-col="date_creation"></span></th>
           <th class="sortable" onclick="onSortColumnClick('commentaire')">Commentaire<span class="sort-arrow" data-col="commentaire"></span></th>
           <th></th>
@@ -843,6 +857,7 @@
       <span class="demande-context-client" id="ctx-client"></span>
       <span class="demande-context-req" id="ctx-demande"></span>
       <span class="demande-context-meta" id="ctx-meta"></span>
+      <span id="ctx-jira"></span>
     </div>
     <div class="demande-context-actions">
       <select id="ctx-statut" onchange="onStatutChange()"></select>
@@ -860,6 +875,7 @@
   <div id="edit-demande-form" class="new-demande-form hidden">
     <input type="text" id="ed-client" placeholder="Client">
     <input type="text" id="ed-titre" placeholder="Titre (ce qui s'affichera dans le tableau)">
+    <input type="text" id="ed-jira" placeholder="Ticket Jira (ex : INTE-4715)">
     <textarea id="ed-demande" rows="2" placeholder="Demande initiale du client"></textarea>
     <div class="new-demande-form-actions">
       <button class="btn-primary" onclick="saveEditDemandeForm()">Enregistrer les modifications</button>
@@ -925,6 +941,7 @@
           <div class="mail-preview-label">
             <span>Aperçu mail : copiable dans Outlook</span>
             <button class="btn-action" id="btn-copy" onclick="copyMail()">Copier mail</button>
+            <button class="btn-action" id="btn-copy-jira" onclick="copyForJira()">Copier pour Jira</button>
           </div>
           <div id="mail-render"></div>
         </div>
@@ -994,6 +1011,16 @@
   function statutDot(statut) {
     const cls = STATUT_BADGE_CLASS[statut] || 's-new';
     return `<span class="statut-dot ${cls}"></span>`;
+  }
+  // ── Lien vers un ticket Jira : on ne stocke que le numéro (ex: INTE-4715),
+  // le lien complet est reconstruit à l'affichage à partir de l'URL de base de l'instance.
+  const JIRA_BASE_URL = 'https://xelians-xd.atlassian.net/browse/';
+  function jiraUrl(ticket) {
+    return JIRA_BASE_URL + encodeURIComponent(ticket);
+  }
+  function jiraLink(ticket) {
+    if (!ticket) return '—';
+    return `<a href="${escapeHtml(jiraUrl(ticket))}" target="_blank" rel="noopener" class="jira-link">${escapeHtml(ticket)}</a>`;
   }
   function updateSyncBadge() {
     const el = document.getElementById('sync-badge');
@@ -1987,11 +2014,51 @@
     });
   }
 
+  // ── Copier pour Jira : demande initiale + tableau de chiffrage, sans la formule de politesse
+  // du mail (le "Bonjour" / "je reste disponible" n'a pas sa place dans un ticket). On repart du
+  // mail déjà construit (toujours à jour car reconstruit à chaque saisie) et on retire juste son
+  // premier et son dernier bloc, qui sont systématiquement la formule d'intro et la formule de fin. ──
+  function copyForJira() {
+    const mailEl = document.getElementById('mail-render');
+    if (!mailEl.innerHTML || mailEl.innerHTML.trim() === '') return;
+
+    syncCurrentDemandeFromCalculator();
+    commitLocal();
+
+    const clone = mailEl.cloneNode(true);
+    if (clone.firstElementChild) clone.firstElementChild.remove(); // "Bonjour, ... le total est de ..."
+    if (clone.lastElementChild) clone.lastElementChild.remove(); // "Je reste disponible ..."
+
+    const d = currentDemandeId ? demandes.find(x => x.id === currentDemandeId) : null;
+    const demandeBlock = d && d.demande
+      ? `<p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;"><b>Demande initiale</b><br>${escapeHtml(d.demande).replace(/\n/g, '<br>')}</p>`
+      : '';
+
+    const html = demandeBlock + clone.innerHTML;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const item = new ClipboardItem({ 'text/html': blob });
+    navigator.clipboard.write([item]).then(() => {
+      const btn = document.getElementById('btn-copy-jira');
+      btn.textContent = 'Copié !';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copier pour Jira'; btn.classList.remove('copied'); }, 2000);
+    }).catch(() => {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      navigator.clipboard.writeText(tmp.innerText).then(() => {
+        const btn = document.getElementById('btn-copy-jira');
+        btn.textContent = 'Copié (texte)';
+        setTimeout(() => { btn.textContent = 'Copier pour Jira'; }, 2000);
+      });
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════
   // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
   // ═══════════════════════════════════════════════════════════
 
-  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'commentaire'];
+  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'commentaire'];
 
   // ── Parsing/sérialisation CSV (RFC4180 simplifié : guillemets doublés, virgules et sauts de ligne dans les champs) ──
   function parseCSV(text) {
@@ -2340,6 +2407,7 @@
       case 'total_forfait': return parseTotalNum(d.total_forfait);
       case 'total_tma': return parseTotalNum(d.total_tma);
       case 'demandeur': return (d.demandeur || '').toLowerCase();
+      case 'jira': return (d.jira || '').toLowerCase();
       case 'date_creation': return d.date_creation || '';
       case 'commentaire': return (d.commentaire || '').toLowerCase();
       default: return '';
@@ -2434,7 +2502,7 @@
     renderSortIndicators();
     if (!sorted.length) {
       const msg = demandes.length ? 'Aucune demande ne correspond aux filtres.' : 'Aucune demande pour l’instant.';
-      tbody.innerHTML = `<tr><td colspan="10" class="empty-row">${msg}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" class="empty-row">${msg}</td></tr>`;
       if (tfoot) tfoot.innerHTML = '';
       return;
     }
@@ -2445,7 +2513,7 @@
         ? `<span class="comment-flag" title="${escapeHtml(d.commentaire)}">💬 ${escapeHtml(truncateText(d.commentaire, 40))}</span>`
         : '';
       return `
-        <tr ondblclick="if (!event.target.closest('.demande-actions')) openDemande('${d.id}')">
+        <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell')) openDemande('${d.id}')">
           <td>${escapeHtml(d.client || '')}</td>
           <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
           <td>${statutBadge(d.statut)}</td>
@@ -2453,6 +2521,7 @@
           <td>${forfaitTxt}</td>
           <td>${tmaTxt}</td>
           <td>${escapeHtml(d.demandeur || '')}</td>
+          <td class="jira-cell">${jiraLink(d.jira)}</td>
           <td>${formatDateOnlyFr(d.date_creation)}</td>
           <td>${commentTxt}</td>
           <td class="demande-actions">
@@ -2471,7 +2540,7 @@
           <td colspan="4" class="foot-label">Total (${sorted.length} demande${sorted.length > 1 ? 's' : ''} affichée${sorted.length > 1 ? 's' : ''})</td>
           <td>${fmt(sumForfait)}</td>
           <td>${fmt(sumTMA)}</td>
-          <td colspan="4"></td>
+          <td colspan="5"></td>
         </tr>`;
     }
   }
@@ -2504,6 +2573,7 @@
     document.getElementById('nd-titre').value = '';
     document.getElementById('nd-demande').value = '';
     document.getElementById('nd-demandeur').value = '';
+    document.getElementById('nd-jira').value = '';
     renderDemandeurDatalist();
     document.getElementById('nd-client').focus();
   }
@@ -2516,12 +2586,13 @@
     const titre = document.getElementById('nd-titre').value.trim();
     const demandeText = document.getElementById('nd-demande').value.trim();
     const demandeur = document.getElementById('nd-demandeur').value.trim();
+    const jira = document.getElementById('nd-jira').value.trim();
     if (!client) { alert('Renseigne au moins le nom du client.'); return; }
     if (!titre) { alert('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.'); return; }
     const now = new Date().toISOString();
     const d = {
       id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-      client, titre, demande: demandeText, demandeur,
+      client, titre, demande: demandeText, demandeur, jira,
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
       type: '', total_forfait: '', total_tma: '',
@@ -2555,6 +2626,7 @@
     if (d.demandeur) metaParts.push('Demandeur : ' + d.demandeur);
     if (d.date_creation) metaParts.push('créée le ' + formatDateOnlyFr(d.date_creation));
     document.getElementById('ctx-meta').textContent = metaParts.join(' · ');
+    document.getElementById('ctx-jira').innerHTML = d.jira ? jiraLink(d.jira) : '';
     const sel = document.getElementById('ctx-statut');
     sel.innerHTML = STATUTS.map(s => `<option value="${escapeHtml(s)}"${s === d.statut ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
 
@@ -2581,6 +2653,7 @@
     if (!d) return;
     document.getElementById('ed-client').value = d.client || '';
     document.getElementById('ed-titre').value = d.titre || '';
+    document.getElementById('ed-jira').value = d.jira || '';
     document.getElementById('ed-demande').value = d.demande || '';
     document.getElementById('edit-demande-form').classList.remove('hidden');
     document.getElementById('ed-client').focus();
@@ -2594,11 +2667,13 @@
     if (!d) return;
     const client = document.getElementById('ed-client').value.trim();
     const titre = document.getElementById('ed-titre').value.trim();
+    const jira = document.getElementById('ed-jira').value.trim();
     const demandeText = document.getElementById('ed-demande').value.trim();
     if (!client) { alert('Renseigne au moins le nom du client.'); return; }
     if (!titre) { alert('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.'); return; }
     d.client = client;
     d.titre = titre;
+    d.jira = jira;
     d.demande = demandeText;
     d.date_maj = new Date().toISOString();
     dirtyDemandeIds.add(d.id);
