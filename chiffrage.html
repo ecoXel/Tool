@@ -370,6 +370,32 @@
   .statut-dot.s-abandoned { background: var(--status-abandoned); }
   .empty-row { color: var(--text-dim); font-style: italic; text-align: center; }
 
+  /* ── Vue "Suivi des commandes" (chiffrages transmis à faire évoluer + suivi du temps passé) ── */
+  .commandes-section { margin-bottom: 28px; }
+  .commandes-section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-mid);
+    margin-bottom: 10px;
+  }
+  .inline-cell-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 5px 7px;
+    outline: none;
+    width: 64px;
+    transition: border-color 0.15s;
+  }
+  .inline-cell-input.inline-cell-text { width: 110px; }
+  .inline-cell-input:focus { border-color: var(--accent); }
+  .diff-pos { color: var(--green); font-weight: 600; }
+  .diff-neg { color: var(--status-closed); font-weight: 600; }
+
   /* ── Barre de contexte demande (dans la vue calculateur) ── */
   .demande-context {
     display: flex;
@@ -782,10 +808,11 @@
   <div class="top-bar">
     <div class="brand-group">
       <h1 class="brand"><span class="brand-name">Chiffrage</span><span class="brand-dot">.</span><span class="brand-suite">docuware</span><span class="brand-cursor"></span></h1>
-      <span class="sync-badge" id="sync-badge" onclick="showView('suivi')" title=""></span>
+      <span class="sync-badge" id="sync-badge" onclick="syncBadgeClick()" title=""></span>
     </div>
     <div class="top-bar-actions">
       <button class="btn-nav" id="nav-suivi" onclick="showView('suivi')">📋 Suivi des demandes</button>
+      <button class="btn-nav" id="nav-commandes" onclick="showView('commandes')">📦 Suivi des commandes</button>
       <button class="btn-reset" onclick="resetAll(); showView('chiffrage');">🧮 Chiffrage</button>
     </div>
   </div>
@@ -848,6 +875,45 @@
       <tbody id="demandes-tbody"></tbody>
       <tfoot id="demandes-tfoot"></tfoot>
     </table>
+  </div>
+
+  <div id="view-commandes" class="hidden">
+    <div class="commandes-section">
+      <div class="commandes-section-title">📤 Transmis — à traiter</div>
+      <table class="demandes-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Titre</th>
+            <th>Demandeur</th>
+            <th>Jira</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="commandes-traiter-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="commandes-section">
+      <div class="commandes-section-title">✅ Commandes validées</div>
+      <table class="demandes-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Titre</th>
+            <th>N° commande</th>
+            <th>Vendu (F)</th>
+            <th>Vendu (TMA)</th>
+            <th>Passé (F)</th>
+            <th>Passé (TMA)</th>
+            <th>Diff (F)</th>
+            <th>Diff (TMA)</th>
+          </tr>
+        </thead>
+        <tbody id="commandes-validees-tbody"></tbody>
+        <tfoot id="commandes-validees-tfoot"></tfoot>
+      </table>
+    </div>
   </div>
 
   <div id="view-chiffrage">
@@ -1031,7 +1097,7 @@
     if (pending > 0) {
       el.classList.add('sync-pending');
       el.textContent = String(pending);
-      el.title = pending + (pending > 1 ? ' changements non enregistrés' : ' changement non enregistré') + ' dans le fichier partagé — pense à "Enregistrer" depuis le Suivi.';
+      el.title = pending + (pending > 1 ? ' changements non enregistrés' : ' changement non enregistré') + ' dans le fichier partagé — clique pour enregistrer maintenant.';
     } else if (fileHandle) {
       el.classList.add('sync-ok');
       el.textContent = '✓';
@@ -1041,6 +1107,15 @@
       el.textContent = '○';
       el.title = 'Travail local uniquement — connecte un fichier CSV partagé depuis le Suivi pour synchroniser avec l’équipe.';
     }
+  }
+
+  // Clic sur le badge de synchro : enregistre tout de suite plutôt que de renvoyer vers le Suivi
+  // pour cliquer sur "Enregistrer" à part — sauf s'il n'y a justement aucun fichier connecté, où
+  // il n'y a rien à enregistrer tant qu'on n'en a pas choisi un (ça, ça reste au Suivi).
+  async function syncBadgeClick() {
+    if (!fileHandle && fileApiSupported) { showView('suivi'); return; }
+    if (currentDemandeId) { syncCurrentDemandeFromCalculator(); commitLocal(); }
+    await saveDemandes();
   }
   let demandes = []; // liste travaillée en local (localStorage) : { id, client, demande, statut, date_creation, date_maj, type, total_forfait, total_tma, etat_json, mail_html }
   let currentDemandeId = null; // demande actuellement ouverte dans le calculateur, ou null en mode "chiffrage libre"
@@ -2097,7 +2172,7 @@
   // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
   // ═══════════════════════════════════════════════════════════
 
-  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'mail_texte', 'commentaire', 'commentaire_texte'];
+  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'mail_texte', 'commentaire', 'commentaire_texte', 'numero_commande', 'temps_passe_forfait', 'temps_passe_tma'];
 
   // ── Conversion HTML → texte brut lisible, pour les colonnes CSV destinées à être ouvertes
   // dans Excel (le mail et le commentaire sont stockés en HTML pour l'app, illisibles tels quels
@@ -2422,8 +2497,11 @@
   function showView(view) {
     document.getElementById('view-chiffrage').classList.toggle('hidden', view !== 'chiffrage');
     document.getElementById('view-suivi').classList.toggle('hidden', view !== 'suivi');
+    document.getElementById('view-commandes').classList.toggle('hidden', view !== 'commandes');
     document.getElementById('nav-suivi').classList.toggle('active', view === 'suivi');
+    document.getElementById('nav-commandes').classList.toggle('active', view === 'commandes');
     if (view === 'suivi') renderDemandesTable();
+    if (view === 'commandes') renderCommandesView();
   }
 
   // ── Rendu de la liste ──
@@ -2642,6 +2720,116 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // ── Suivi des commandes : chiffrages Transmis à faire évoluer vers Validé/Refus/Abandonné,
+  //    et suivi du temps réellement passé une fois la commande validée (numéro de commande,
+  //    temps passé forfait/TMA saisis directement dans le tableau, différence calculée à la volée).
+  // ═══════════════════════════════════════════════════════════
+  function renderCommandesView() {
+    renderCommandesATraiter();
+    renderCommandesValidees();
+  }
+
+  // Bascule rapide de statut depuis le tableau "à traiter" (pas besoin de rouvrir la demande).
+  function quickStatutChange(id, statut) {
+    const d = demandes.find(x => x.id === id);
+    if (!d) return;
+    d.statut = statut;
+    d.date_maj = new Date().toISOString();
+    dirtyDemandeIds.add(id);
+    commitLocal(); // rafraîchit aussi le tableau de suivi des demandes (la ligne y change de statut)
+    renderCommandesView();
+  }
+
+  function renderCommandesATraiter() {
+    const tbody = document.getElementById('commandes-traiter-tbody');
+    if (!tbody) return;
+    const rows = demandes.filter(d => d.statut === 'Transmis')
+      .sort((a, b) => (a.date_maj || '').localeCompare(b.date_maj || ''));
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Aucun chiffrage transmis en attente de retour.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(d => `
+      <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell')) openDemande('${d.id}')">
+        <td>${escapeHtml(d.client || '')}</td>
+        <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
+        <td>${escapeHtml(d.demandeur || '')}</td>
+        <td class="jira-cell">${jiraLink(d.jira)}</td>
+        <td class="demande-actions">
+          <button class="btn-icon" onclick="quickStatutChange('${d.id}','Validé')" title="Marquer validé">✅</button>
+          <button class="btn-icon btn-icon-danger" onclick="quickStatutChange('${d.id}','Refus')" title="Marquer refusé">❌</button>
+          <button class="btn-icon" onclick="quickStatutChange('${d.id}','Abandonné')" title="Marquer abandonné">🚫</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  // Différence vendu - passé, affichée en vert/rouge selon le signe. "—" tant qu'il n'y a
+  // ni vendu ni passé (rien à comparer), "0" si les deux se valent exactement.
+  function diffCellHtml(vendu, passe) {
+    if (!vendu && !passe) return '<span class="tbl-value na">—</span>';
+    const diff = parseTotalNum(vendu) - parseTotalNum(passe);
+    const cls = diff < 0 ? 'diff-neg' : (diff > 0 ? 'diff-pos' : '');
+    const sign = diff > 0 ? '+' : '';
+    return `<span class="${cls}">${sign}${fmtNum(diff)}</span>`;
+  }
+
+  function renderCommandesValidees() {
+    const tbody = document.getElementById('commandes-validees-tbody');
+    const tfoot = document.getElementById('commandes-validees-tfoot');
+    if (!tbody) return;
+    const rows = demandes.filter(d => d.statut === 'Validé')
+      .sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''));
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-row">Aucune commande validée pour l’instant.</td></tr>`;
+      if (tfoot) tfoot.innerHTML = '';
+      return;
+    }
+    tbody.innerHTML = rows.map(d => `
+      <tr ondblclick="if (!event.target.closest('input')) openDemande('${d.id}')">
+        <td>${escapeHtml(d.client || '')}</td>
+        <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
+        <td><input type="text" class="inline-cell-input inline-cell-text" value="${escapeHtml(d.numero_commande || '')}" placeholder="—" onchange="onCommandeFieldChange('${d.id}','numero_commande',this.value)"></td>
+        <td>${d.total_forfait ? escapeHtml(d.total_forfait) : '—'}</td>
+        <td>${d.total_tma ? escapeHtml(d.total_tma) : '—'}</td>
+        <td><input type="number" class="inline-cell-input" min="0" step="0.5" value="${escapeHtml(d.temps_passe_forfait || '')}" placeholder="0" onchange="onCommandeFieldChange('${d.id}','temps_passe_forfait',this.value)"></td>
+        <td><input type="number" class="inline-cell-input" min="0" step="0.5" value="${escapeHtml(d.temps_passe_tma || '')}" placeholder="0" onchange="onCommandeFieldChange('${d.id}','temps_passe_tma',this.value)"></td>
+        <td id="diff-f-${d.id}">${diffCellHtml(d.total_forfait, d.temps_passe_forfait)}</td>
+        <td id="diff-t-${d.id}">${diffCellHtml(d.total_tma, d.temps_passe_tma)}</td>
+      </tr>`).join('');
+
+    if (tfoot) {
+      const sumVenduF = rows.reduce((acc, d) => acc + parseTotalNum(d.total_forfait), 0);
+      const sumVenduT = rows.reduce((acc, d) => acc + parseTotalNum(d.total_tma), 0);
+      const sumPasseF = rows.reduce((acc, d) => acc + parseTotalNum(d.temps_passe_forfait), 0);
+      const sumPasseT = rows.reduce((acc, d) => acc + parseTotalNum(d.temps_passe_tma), 0);
+      tfoot.innerHTML = `
+        <tr>
+          <td colspan="3" class="foot-label">Total (${rows.length} commande${rows.length > 1 ? 's' : ''})</td>
+          <td>${fmt(sumVenduF)}</td>
+          <td>${fmt(sumVenduT)}</td>
+          <td>${fmt(sumPasseF)}</td>
+          <td>${fmt(sumPasseT)}</td>
+          <td>${diffCellHtml(sumVenduF, sumPasseF)}</td>
+          <td>${diffCellHtml(sumVenduT, sumPasseT)}</td>
+        </tr>`;
+    }
+  }
+
+  // Édition inline (numéro de commande / temps passé) : on ne redessine que le tableau des
+  // commandes validées (pas tout le suivi), et seulement au blur/Enter (onchange), pas à chaque
+  // frappe — inutile de re-render 20 fois pendant qu'elle tape "3.5".
+  function onCommandeFieldChange(id, field, value) {
+    const d = demandes.find(x => x.id === id);
+    if (!d) return;
+    d[field] = field === 'numero_commande' ? value.trim() : value;
+    d.date_maj = new Date().toISOString();
+    dirtyDemandeIds.add(id);
+    persistLocal();
+    updateSyncBadge();
+    renderCommandesValidees();
+  }
+
   // ── Suggestions de "demandeur" : liste qui s'enrichit toute seule, en local uniquement
   // (elle n'a pas besoin d'être partagée — c'est juste une aide à la saisie) ──
   const DEMANDEURS_LS_KEY = 'chiffrage-demandeurs-v1';
@@ -2693,7 +2881,8 @@
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
       type: '', total_forfait: '', total_tma: '',
-      etat_json: '', mail_html: '', mail_texte: ''
+      etat_json: '', mail_html: '', mail_texte: '',
+      numero_commande: '', temps_passe_forfait: '', temps_passe_tma: ''
     };
     demandes.push(d);
     dirtyDemandeIds.add(d.id);
