@@ -233,17 +233,27 @@
   }
   .demandes-table tfoot .foot-label { color: var(--text-dim); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
   .demande-cell { max-width: 320px; }
-  .comment-flag {
-    color: var(--text-mid);
-    font-size: 11px;
-    white-space: nowrap;
-    max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
-    vertical-align: bottom;
+  /* Commentaire : plus de colonne dédiée, juste une pastille 💬 après le titre, texte en infobulle. */
+  .comment-flag { margin-left: 4px; font-size: 11px; cursor: help; opacity: 0.8; }
+  .comment-flag:hover { opacity: 1; }
+  /* Le flex est sur un div interne : posé directement sur le <td>, il le sortait du modèle
+     de tableau (bordures décalées, cellule qui débordait). Boutons en grille 2×2 pour que
+     le tableau tienne dans la largeur du conteneur. */
+  .demandes-table td.demande-actions { width: 1%; }
+  .demande-actions-inner { display: grid; grid-template-columns: repeat(2, 26px); gap: 4px; }
+  .demande-actions-inner .btn-icon { width: 26px; height: 26px; font-size: 12px; }
+  /* Statut modifiable d'un clic depuis le tableau de suivi */
+  .statut-cell .statut-badge { cursor: pointer; }
+  .statut-cell .statut-badge:hover { outline: 1px solid currentColor; }
+  .statut-inline-select {
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 4px;
+    outline: none;
   }
-  .demande-actions { display: flex; gap: 6px; white-space: nowrap; }
 
   /* ── Boutons icône (actions de ligne dans le tableau, "+" de la toolbar) ── */
   .btn-icon {
@@ -868,7 +878,6 @@
           <th class="sortable" onclick="onSortColumnClick('demandeur')">Demandeur<span class="sort-arrow" data-col="demandeur"></span></th>
           <th class="sortable" onclick="onSortColumnClick('jira')">Jira<span class="sort-arrow" data-col="jira"></span></th>
           <th class="sortable" onclick="onSortColumnClick('date_creation')">Date demande<span class="sort-arrow" data-col="date_creation"></span></th>
-          <th class="sortable" onclick="onSortColumnClick('commentaire')">Commentaire<span class="sort-arrow" data-col="commentaire"></span></th>
           <th></th>
         </tr>
       </thead>
@@ -2582,7 +2591,6 @@
       case 'demandeur': return (d.demandeur || '').toLowerCase();
       case 'jira': return (d.jira || '').toLowerCase();
       case 'date_creation': return d.date_creation || '';
-      case 'commentaire': return (d.commentaire || '').toLowerCase();
       default: return '';
     }
   }
@@ -2675,7 +2683,7 @@
     renderSortIndicators();
     if (!sorted.length) {
       const msg = demandes.length ? 'Aucune demande ne correspond aux filtres.' : 'Aucune demande pour l’instant.';
-      tbody.innerHTML = `<tr><td colspan="11" class="empty-row">${msg}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-row">${msg}</td></tr>`;
       if (tfoot) tfoot.innerHTML = '';
       return;
     }
@@ -2685,27 +2693,26 @@
       // Le commentaire est stocké en HTML (mise en forme riche) : on l'affiche ici en texte brut,
       // sinon la puce/l'infobulle montrerait les balises telles quelles.
       const commentPlain = d.commentaire ? htmlToPlainText(d.commentaire) : '';
-      const commentTxt = commentPlain
-        ? `<span class="comment-flag" title="${escapeHtml(commentPlain)}">💬 ${escapeHtml(truncateText(commentPlain.replace(/\s+/g, ' ').trim(), 40))}</span>`
+      const commentTxt = commentPlain.trim()
+        ? `<span class="comment-flag" title="${escapeHtml(commentPlain.trim())}">💬</span>`
         : '';
       return `
-        <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell')) openDemande('${d.id}')">
+        <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell') && !event.target.closest('.statut-cell')) openDemande('${d.id}')">
           <td>${escapeHtml(d.client || '')}</td>
-          <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
-          <td>${statutBadge(d.statut)}</td>
+          <td class="demande-cell"><span title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</span>${commentTxt}</td>
+          <td class="statut-cell" onclick="editStatutInline(this, '${d.id}')" title="Cliquer pour changer le statut">${statutBadge(d.statut)}</td>
           <td>${formatDateFr(d.date_maj)}</td>
           <td>${forfaitTxt}</td>
           <td>${tmaTxt}</td>
           <td>${escapeHtml(d.demandeur || '')}</td>
           <td class="jira-cell">${jiraLink(d.jira)}</td>
           <td>${formatDateOnlyFr(d.date_creation)}</td>
-          <td>${commentTxt}</td>
-          <td class="demande-actions">
+          <td class="demande-actions"><div class="demande-actions-inner">
             <button class="btn-icon" onclick="openDemande('${d.id}')" title="Ouvrir dans le calculateur">🧮</button>
             <button class="btn-icon" onclick="openDemandeForEdit('${d.id}')" title="Modifier client / titre / demande">✏️</button>
             <button class="btn-icon" onclick="duplicateDemande('${d.id}')" title="Dupliquer ce chiffrage">📑</button>
             <button class="btn-icon btn-icon-danger" onclick="deleteDemande('${d.id}')" title="Supprimer">🗑️</button>
-          </td>
+          </div></td>
         </tr>`;
     }).join('');
 
@@ -2717,9 +2724,31 @@
           <td colspan="4" class="foot-label">Total (${sorted.length} demande${sorted.length > 1 ? 's' : ''} affichée${sorted.length > 1 ? 's' : ''})</td>
           <td>${fmt(sumForfait)}</td>
           <td>${fmt(sumTMA)}</td>
-          <td colspan="5"></td>
+          <td colspan="4"></td>
         </tr>`;
     }
+  }
+
+  // Clic sur le badge de statut dans le tableau de suivi : on le remplace par une liste
+  // déroulante ; le choix est appliqué tout de suite, et quitter la liste sans choisir
+  // remet simplement le badge.
+  function editStatutInline(td, id) {
+    if (td.querySelector('select')) return;
+    const d = demandes.find(x => x.id === id);
+    if (!d) return;
+    td.innerHTML = `<select class="statut-inline-select">${STATUTS.map(s => `<option value="${escapeHtml(s)}"${s === d.statut ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select>`;
+    const sel = td.querySelector('select');
+    let done = false;
+    const finish = (apply) => {
+      if (done) return;
+      done = true;
+      if (apply && sel.value !== d.statut) quickStatutChange(id, sel.value);
+      else renderDemandesTable();
+    };
+    sel.addEventListener('change', () => finish(true));
+    sel.addEventListener('blur', () => finish(false));
+    sel.addEventListener('keydown', (e) => { if (e.key === 'Escape') finish(false); });
+    sel.focus();
   }
 
   // ═══════════════════════════════════════════════════════════
