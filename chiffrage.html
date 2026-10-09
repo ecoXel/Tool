@@ -929,6 +929,7 @@
       <select id="ctx-statut" onchange="onStatutChange()"></select>
       <button class="btn-action" onclick="openEditDemandeForm()">✏️ Modifier</button>
       <button class="btn-action" onclick="manualSave()">💾 Enregistrer</button>
+      <button class="btn-action" onclick="duplicateDemande(currentDemandeId)" title="Créer une nouvelle demande à partir de ce chiffrage">📑 Dupliquer</button>
       <button class="btn-action" onclick="backToSuivi()">◀ Retour au suivi</button>
     </div>
   </div>
@@ -2702,6 +2703,7 @@
           <td class="demande-actions">
             <button class="btn-icon" onclick="openDemande('${d.id}')" title="Ouvrir dans le calculateur">🧮</button>
             <button class="btn-icon" onclick="openDemandeForEdit('${d.id}')" title="Modifier client / titre / demande">✏️</button>
+            <button class="btn-icon" onclick="duplicateDemande('${d.id}')" title="Dupliquer ce chiffrage">📑</button>
             <button class="btn-icon btn-icon-danger" onclick="deleteDemande('${d.id}')" title="Supprimer">🗑️</button>
           </td>
         </tr>`;
@@ -2899,6 +2901,34 @@
     deletedDemandeIds.add(id);
     if (currentDemandeId === id) { currentDemandeId = null; hideDemandeContextBar(); }
     commitLocal();
+  }
+
+  // Duplique une demande (chiffrage compris) pour repartir d'une base existante : on garde
+  // client, demandeur, texte, calculateur, mail et commentaire, mais la copie est une nouvelle
+  // demande à part entière — statut remis au départ, dates du jour, et ni ticket Jira ni
+  // suivi de commande (n° / temps passé), qui sont propres à la demande d'origine.
+  function duplicateDemande(id) {
+    if (!id) return;
+    // Si c'est la demande ouverte, on capture d'abord l'état courant du calculateur pour
+    // ne pas dupliquer une version périmée.
+    if (currentDemandeId === id) syncCurrentDemandeFromCalculator();
+    const src = demandes.find(x => x.id === id);
+    if (!src) return;
+    const now = new Date().toISOString();
+    const d = Object.assign({}, src, {
+      id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      titre: (src.titre || truncateText(src.demande || '', 60) || 'Sans titre') + ' (copie)',
+      jira: '',
+      statut: STATUTS[0],
+      date_creation: now, date_maj: now,
+      numero_commande: '', temps_passe_forfait: '', temps_passe_tma: ''
+    });
+    demandes.push(d);
+    dirtyDemandeIds.add(d.id);
+    commitLocal();
+    // On ouvre directement la copie avec le formulaire de modification : en pratique on
+    // veut presque toujours renommer le titre / changer de client juste après.
+    openDemandeForEdit(d.id);
   }
 
   // ── Barre de contexte "demande ouverte" au-dessus du calculateur ──
