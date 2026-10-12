@@ -3136,32 +3136,57 @@
     const type = str(r.type).toLowerCase().startsWith('pre') ? 'preconf' : 'normal';
     const fields = {};
     let paramRevealedState = true;
+    let atelierTouchedState = false;
+
+    // Hébergement + environnements hors prod : l'installation est calculée ici avec la règle
+    // maison plutôt que laissée à l'IA (cloud : 0,5 j ; on-premise : 2 j + 1 j par environnement
+    // hors prod, ex. intégration + prod = 3 j). Sans hébergement précisé : jours fournis par l'IA.
+    const hebergementRaw = str(r.hebergement || r.environnement);
+    const heb = hebergementRaw.toLowerCase();
+    const isCloud = heb.includes('cloud');
+    const isOnPrem = !isCloud && /prem|site|local/.test(heb);
+    const envRaw = parseInt(r.environnements_hors_prod, 10);
+    const envHorsProd = isFinite(envRaw) && envRaw >= 0 ? envRaw : null;
+    const installDays = isCloud ? 0.5 : isOnPrem ? 2 + (envHorsProd || 0) : aiDays(r.installation_j);
+
     if (type === 'normal') {
       fields['in-config'] = String(aiDays(r.parametrage_j));
-      fields['in-install'] = String(aiDays(r.installation_j));
+      fields['in-install'] = String(installDays);
       fields['in-dev'] = String(aiDays(r.developpement_j));
       fields['in-connecteurs-f'] = String(aiDays(r.connecteurs_j));
       fields['in-detail'] = aiTextToRichHtml(r.detail_parametrage);
       fields['in-connecteurs-detail'] = aiTextToRichHtml(r.detail_connecteurs);
       fields['in-ateliers-detail'] = aiTextToRichHtml(r.detail_ateliers);
+      // Nombre d'environnements hors prod → ligne Mise en production.
+      if (envHorsProd !== null) fields['in-env'] = String(Math.min(envHorsProd, 10));
+      // Nombre d'ateliers = nombre de lignes de la liste recommandée (l'atelier de validation
+      // est inclus d'office par la règle) ; sinon, le nombre par défaut selon le paramétrage.
+      const nbAteliers = String(r.detail_ateliers || '').split(/\r?\n/).filter(l => /^\s*[-•*]\s+\S/.test(l)).length;
+      if (nbAteliers > 0) { fields['in-ateliers'] = String(Math.min(nbAteliers, 20)); atelierTouchedState = true; }
       // Même logique que le gate : sans aucun jour saisi, on reste sur l'écran de paramétrage.
-      paramRevealedState = aiDays(r.parametrage_j) + aiDays(r.installation_j) + aiDays(r.developpement_j) > 0;
+      paramRevealedState = aiDays(r.parametrage_j) + installDays + aiDays(r.developpement_j) > 0;
     }
+
+    const contexte = [];
+    if (hebergementRaw) contexte.push('Hébergement : ' + hebergementRaw);
+    if (envHorsProd !== null) contexte.push(envHorsProd + ' environnement' + (envHorsProd > 1 ? 's' : '') + ' hors prod');
+    const justification = [str(r.justification), str(r.points_a_verifier) ? 'À vérifier : ' + str(r.points_a_verifier) : '']
+      .filter(Boolean).join('\n');
     const now = new Date().toISOString();
     return {
       id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       client: str(r.client) || '(client à préciser)',
       titre: str(r.titre) || truncateText(demandeText, 60),
-      demande: demandeText,
+      demande: demandeText + (contexte.length ? '\n\n' + contexte.join(' — ') : ''),
       demandeur: str(r.demandeur),
       jira: str(r.jira),
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
       type, total_forfait: '', total_tma: '',
-      etat_json: JSON.stringify({ currentType: type, atelierTouched: false, paramRevealed: paramRevealedState, manualTouched: [], fields }),
+      etat_json: JSON.stringify({ currentType: type, atelierTouched: atelierTouchedState, paramRevealed: paramRevealedState, manualTouched: [], fields }),
       mail_html: '', mail_texte: '', commentaire: '',
       numero_commande: '', temps_passe_forfait: '', temps_passe_tma: '',
-      ia_source: sourceName, ia_justification: str(r.justification)
+      ia_source: sourceName, ia_justification: justification
     };
   }
 

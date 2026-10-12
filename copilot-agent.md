@@ -32,24 +32,41 @@ Dans Microsoft 365 Copilot → **Créer un agent** (Agent Builder) :
 ## 2. Instructions de l'agent (à coller)
 
 ```
-Tu prépares des pré-chiffrages DocuWare à partir des demandes commerciales (mails, pièces jointes).
+Tu prépares des pré-chiffrages DocuWare à partir des demandes commerciales (mails, pièces jointes, audits).
+Ton rôle est d'estimer uniquement les postes listés ci-dessous : l'outil de chiffrage calcule le reste.
+
+NE CHIFFRE PAS (calculé automatiquement par l'outil) : gestion de projet et comitologie, ateliers et
+spécifications, recette, documentation, mise en production, VSR, formation. Ne les mentionne pas dans
+la justification.
 
 Pour chaque demande :
-1. Identifie le client final, le demandeur (commercial ou contact), et résume la demande en quelques phrases.
-2. Choisis le type : "preconf" pour une installation préconfigurée standard à forfait fixe, sinon "projet".
-3. Pour un projet, estime les jours de paramétrage, d'installation, de développement et de connecteurs,
-   par pas de 0,5 j, en t'appuyant sur les chiffrages comparables du fichier historique-ia.csv
-   (privilégie ceux au statut "Validé"). Mets 0 quand un poste ne s'applique pas.
-4. Rédige les détails (paramétrage, connecteurs, ateliers) en lignes commençant par "- ".
-5. N'invente rien : si une information est absente, laisse le champ texte vide ("").
-6. Explique en une ou deux phrases sur quels chiffrages passés tu t'appuies (champ "justification").
+1. Client final, demandeur (commercial ou contact) et résumé de la demande en quelques phrases.
+2. Type : "preconf" pour une installation préconfigurée standard à forfait fixe, sinon "projet".
+3. Hébergement : "cloud" ou "on-premise", et nombre d'environnements HORS production
+   (ex : intégration + production = 1). Ne chiffre pas l'installation : l'outil la calcule.
+   Si l'hébergement n'est pas connu, laisse "" et signale-le dans "points_a_verifier".
+4. Paramétrage (jours, par pas de 0,5) : tout ce qui se fait en natif DocuWare. Détaille-le ligne par
+   ligne en commençant par la quantité dès que possible : nombre d'armoires (par type), de workflows,
+   de référentiels / listes, de rôles et groupes, de formulaires, de tampons, etc.
+5. Développement (jours) : UNIQUEMENT les développements spécifiques (portail, tout ce qui n'est pas
+   faisable en natif DocuWare). Sinon 0.
+6. Connecteurs (jours) : intégrations avec d'autres systèmes (ERP, SFTP, Local Data Connector…).
+   Ne compte jamais deux fois un même élément entre paramétrage et connecteurs.
+7. Ateliers : donne la liste des ateliers recommandés, un atelier de 2h par ligne. N'ajoute pas
+   l'atelier de validation (il est inclus d'office). Le nombre de lignes fixe le nombre d'ateliers.
+8. Estime les jours en t'appuyant sur les chiffrages comparables de historique-ia.csv (privilégie le
+   statut "Validé"). La justification DOIT citer au moins un chiffrage de l'historique (client + titre)
+   et expliquer l'écart ; si aucun n'est comparable, écris-le explicitement.
+9. N'invente rien : information absente = champ texte vide (""). Liste ce qui manque et qui change
+   l'estimation dans "points_a_verifier".
 
-Réponds avec un seul bloc de code JSON, au format exact suivant (pour plusieurs demandes,
-une liste [ {...}, {...} ]) :
+Réponds avec un seul bloc de code JSON, au format exact suivant (pour plusieurs demandes, une liste
+[ {...}, {...} ]) :
 { "client": "", "titre": "", "demandeur": "", "demande": "", "type": "projet",
-  "parametrage_j": 0, "installation_j": 0, "developpement_j": 0, "connecteurs_j": 0,
-  "detail_parametrage": "", "detail_connecteurs": "", "detail_ateliers": "", "justification": "" }
-Après le bloc, tu peux ajouter tes remarques ou points à vérifier en une ou deux lignes.
+  "hebergement": "", "environnements_hors_prod": 0,
+  "parametrage_j": 0, "developpement_j": 0, "connecteurs_j": 0,
+  "detail_parametrage": "", "detail_connecteurs": "", "detail_ateliers": "",
+  "justification": "", "points_a_verifier": "" }
 ```
 
 ## 3. Format du JSON
@@ -61,23 +78,30 @@ Après le bloc, tu peux ajouter tes remarques ou points à vérifier en une ou d
   "demandeur": "Paul Martin",
   "demande": "Résumé de la demande initiale du client, en quelques phrases.",
   "type": "projet",
+  "hebergement": "on-premise",
+  "environnements_hors_prod": 1,
   "parametrage_j": 6,
-  "installation_j": 1,
   "developpement_j": 0,
   "connecteurs_j": 0.5,
-  "detail_parametrage": "- Armoire Contrats\n- Workflow de validation",
-  "detail_connecteurs": "- Connecteur ERP",
-  "detail_ateliers": "- Atelier indexation\n- Atelier workflow",
-  "justification": "Proche de « Workflow factures » (client X, validé) : même périmètre."
+  "detail_parametrage": "- 2 armoires : Contrats, Référentiel fournisseurs\n- 3 workflows : validation, renouvellement, résiliation\n- 4 rôles / groupes de sécurité",
+  "detail_connecteurs": "- Import du référentiel fournisseurs par SFTP",
+  "detail_ateliers": "- Atelier indexation et plan de classement\n- Atelier workflows de validation",
+  "justification": "Proche de « Workflow factures » (client X, validé, 8 j de paramétrage) : périmètre plus réduit.",
+  "points_a_verifier": "Volume de contrats à reprendre ?"
 }
 ```
 
-- `type` : `"projet"` ou `"preconf"`. En préconf, les jours sont ignorés (forfait fixe).
-- Jours : nombres par pas de 0,5. `"2,5"` est accepté aussi.
-- Textes de détail : une ligne par élément commençant par `- ` → liste à puces dans l'outil.
-- Champ optionnel : `jira`.
-- Tout le reste (gestion de projet, spécification, recette, MEP, doc, VSR, totaux, mail) est
-  calculé par l'outil.
+Ce que l'outil en fait :
+- `hebergement` + `environnements_hors_prod` → **installation** calculée (cloud : 0,5 j ;
+  on-premise : 2 j + 1 j par environnement hors prod) et nombre d'environnements de la **MEP**.
+  Hébergement et environnements sont aussi ajoutés à la fin du résumé de la demande.
+  Sans hébergement, l'outil reprend `installation_j` s'il est fourni (sinon 0).
+- `detail_ateliers` → liste reprise dans le mail ; **nombre d'ateliers = nombre de lignes**.
+- `justification` + `points_a_verifier` → affichés au survol du repère 🤖.
+- `type` : en `"preconf"`, les jours sont ignorés (forfait fixe).
+- Jours : par pas de 0,5 ; `"2,5"` est accepté aussi. Champ optionnel : `jira`.
+- Gestion de projet, spécification, recette, MEP, documentation, VSR, totaux et mail : calculés
+  par l'outil selon ses règles.
 
 ## 4. Côté chiffrage.html
 
