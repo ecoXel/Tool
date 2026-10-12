@@ -1,28 +1,58 @@
 # Agent Copilot « Pré-chiffrage »
 
-L'agent lit une demande commerciale (mail, pièces jointes) et dépose **un fichier JSON par
-demande** dans le dossier partagé. L'outil `chiffrage.html` les importe, calcule le reste avec
-ses règles habituelles et les enregistre dans le CSV.
+L'agent lit une demande commerciale (mail, pièces jointes) et répond par un **bloc JSON**.
+Tu importes ce JSON dans `chiffrage.html`, qui calcule le reste avec ses règles habituelles.
 
 ```
-Dossier OneDrive partagé/
-├── demandes_chiffrage.csv      ← la base, écrite uniquement par chiffrage.html
-├── historique-ia.csv           ← version allégée, réécrite à chaque enregistrement (source de l'agent)
-└── chiffrages-en-attente/      ← l'agent dépose ici ; vidé par chiffrage.html après import
-    └── erreurs/                ← fichiers JSON illisibles, mis de côté
+Mail du commercial ──► Agent Copilot ──► JSON
+                                          │  copier-coller  (bouton 🤖 du Suivi)
+                                          │  ou fichier .json
+                                          ▼
+                                   chiffrage.html ──► CSV
 ```
 
-L'agent **n'écrit jamais dans le CSV principal**.
+L'agent **n'écrit rien nulle part** : il propose, tu importes et tu relis.
 
-> ⚠️ Les noms de menus Microsoft ci-dessous sont indicatifs : l'interface de Copilot Studio et de
-> Power Automate change souvent et n'a pas été vérifiée. Il faut aussi que ces outils soient
-> ouverts dans le tenant (licence et autorisation de l'IT).
+> ⚠️ Les noms de menus Microsoft ci-dessous sont indicatifs : l'interface de Copilot change souvent
+> et n'a pas été vérifiée.
 
 ---
 
-## 1. Format du fichier déposé
+## 1. Créer l'agent
 
-Un fichier `.json` par demande, avec un nom unique (ex : `chiffrage-20261012-143005.json`) :
+Dans Microsoft 365 Copilot → **Créer un agent** (Agent Builder) :
+
+1. **Nom** : Pré-chiffrage DocuWare.
+2. **Instructions** : coller le bloc de la section 2.
+3. **Connaissances** : ajouter `historique-ia.csv`, qui se trouve dans le dossier partagé à côté du
+   CSV (voir section 4). Si le format CSV n'est pas accepté comme source, le signaler : l'outil peut
+   écrire l'historique dans un autre format.
+4. Créer, puis l'utiliser dans Copilot ou Outlook : sur le mail du commercial → « Pré-chiffre ce mail ».
+
+## 2. Instructions de l'agent (à coller)
+
+```
+Tu prépares des pré-chiffrages DocuWare à partir des demandes commerciales (mails, pièces jointes).
+
+Pour chaque demande :
+1. Identifie le client final, le demandeur (commercial ou contact), et résume la demande en quelques phrases.
+2. Choisis le type : "preconf" pour une installation préconfigurée standard à forfait fixe, sinon "projet".
+3. Pour un projet, estime les jours de paramétrage, d'installation, de développement et de connecteurs,
+   par pas de 0,5 j, en t'appuyant sur les chiffrages comparables du fichier historique-ia.csv
+   (privilégie ceux au statut "Validé"). Mets 0 quand un poste ne s'applique pas.
+4. Rédige les détails (paramétrage, connecteurs, ateliers) en lignes commençant par "- ".
+5. N'invente rien : si une information est absente, laisse le champ texte vide ("").
+6. Explique en une ou deux phrases sur quels chiffrages passés tu t'appuies (champ "justification").
+
+Réponds avec un seul bloc de code JSON, au format exact suivant (pour plusieurs demandes,
+une liste [ {...}, {...} ]) :
+{ "client": "", "titre": "", "demandeur": "", "demande": "", "type": "projet",
+  "parametrage_j": 0, "installation_j": 0, "developpement_j": 0, "connecteurs_j": 0,
+  "detail_parametrage": "", "detail_connecteurs": "", "detail_ateliers": "", "justification": "" }
+Après le bloc, tu peux ajouter tes remarques ou points à vérifier en une ou deux lignes.
+```
+
+## 3. Format du JSON
 
 ```json
 {
@@ -44,68 +74,28 @@ Un fichier `.json` par demande, avec un nom unique (ex : `chiffrage-20261012-143
 
 - `type` : `"projet"` ou `"preconf"`. En préconf, les jours sont ignorés (forfait fixe).
 - Jours : nombres par pas de 0,5. `"2,5"` est accepté aussi.
-- Textes de détail : une ligne par élément, commençant par `- ` → liste à puces dans l'outil.
+- Textes de détail : une ligne par élément commençant par `- ` → liste à puces dans l'outil.
 - Champ optionnel : `jira`.
 - Tout le reste (gestion de projet, spécification, recette, MEP, doc, VSR, totaux, mail) est
   calculé par l'outil.
 
-## 2. Consignes de l'agent (à coller dans les instructions)
-
-```
-Tu prépares des pré-chiffrages DocuWare à partir des demandes commerciales (mails, pièces jointes).
-
-Pour chaque demande :
-1. Identifie le client final, le demandeur (commercial ou contact), et résume la demande en quelques phrases.
-2. Choisis le type : "preconf" pour une installation préconfigurée standard à forfait fixe, sinon "projet".
-3. Pour un projet, estime les jours de paramétrage, d'installation, de développement et de connecteurs,
-   par pas de 0,5 j, en t'appuyant sur les chiffrages comparables du fichier historique-ia.csv
-   (privilégie ceux au statut "Validé"). Mets 0 quand un poste ne s'applique pas.
-4. Rédige les détails (paramétrage, connecteurs, ateliers) en lignes commençant par "- ".
-5. N'invente rien : si une information est absente, laisse le champ texte vide ("").
-6. Explique en une ou deux phrases sur quels chiffrages passés tu t'appuies (champ "justification").
-
-Produis un objet JSON strictement au format suivant, sans aucun texte autour :
-{ "client": "", "titre": "", "demandeur": "", "demande": "", "type": "projet",
-  "parametrage_j": 0, "installation_j": 0, "developpement_j": 0, "connecteurs_j": 0,
-  "detail_parametrage": "", "detail_connecteurs": "", "detail_ateliers": "", "justification": "" }
-
-Montre-moi le JSON et demande confirmation, puis appelle l'action "Déposer un pré-chiffrage" avec ce JSON.
-```
-
-## 3. Mise en place (Copilot Studio + Power Automate)
-
-Un agent simple (Agent Builder) sait **lire** des sources mais pas **écrire** de fichier :
-il faut un agent Copilot Studio avec une action Power Automate.
-
-1. **Créer l'agent** dans Copilot Studio, coller les consignes ci-dessus.
-2. **Connaissances** : ajouter `historique-ia.csv` (OneDrive/SharePoint). Si le format CSV n'est
-   pas accepté comme source, le signaler : l'outil peut écrire l'historique dans un autre format.
-3. **Action « Déposer un pré-chiffrage »** = un flux Power Automate déclenché par l'agent :
-   - entrée : un texte `json` ;
-   - étape **OneDrive for Business → Créer un fichier** :
-     - Chemin du dossier : `/…/<dossier partagé>/chiffrages-en-attente`
-     - Nom du fichier : `concat('chiffrage-', utcNow('yyyyMMdd-HHmmss'), '.json')`
-     - Contenu du fichier : l'entrée `json`
-   - sortie : « Pré-chiffrage déposé ».
-4. **Publier** l'agent dans Microsoft 365 Copilot / Teams / Outlook.
-
-Usage : dans Outlook, sur le mail du commercial → « Pré-chiffre ce mail ».
-
 ## 4. Côté chiffrage.html
 
-- Connecter une fois le **dossier** partagé (bouton « Choisir le dossier partagé… »). Le navigateur
-  (Edge/Chrome) demande l'autorisation de modifier les fichiers ; après un redémarrage du
-  navigateur, un clic sur « Reconnecter » suffit.
-- Au démarrage ou après « Charger », le bouton **« 🤖 N chiffrages en attente d'import »** apparaît
-  s'il y a des fichiers dans `chiffrages-en-attente/`.
-- L'import crée les demandes (statut « Demande », repère 🤖, justification au survol), enregistre
-  le CSV, puis supprime les JSON traités.
-- `historique-ia.csv` est réécrit à chaque « Enregistrer ».
+**Importer** : vue Suivi → bouton **🤖** (à gauche du « + ») :
+- coller la réponse de Copilot telle quelle : le texte autour et les ```json sont ignorés, et
+  plusieurs blocs ou une liste créent plusieurs demandes ;
+- ou « importer un fichier .json… » si tu as enregistré la réponse dans un fichier.
 
-Limites connues :
-- **Synchronisation OneDrive** : un fichier déposé par Power Automate met quelques secondes à
-  quelques minutes à arriver sur le PC.
-- **Tout le monde doit utiliser la nouvelle version de `chiffrage.html`** : une ancienne version
-  enregistrerait le CSV sans les colonnes `ia_source` / `ia_justification`.
-- Si deux personnes importent exactement au même moment, une demande peut être créée en double
-  (rare : il suffit de supprimer le doublon).
+Une seule demande importée s'ouvre directement dans le calculateur pour relecture ; plusieurs
+apparaissent dans le Suivi. Elles ont le statut « Demande » et le repère 🤖, avec la justification
+au survol. Comme pour une saisie à la main, elles sont en local jusqu'à « Enregistrer ».
+
+**Historique pour l'agent** : `historique-ia.csv` est réécrit à côté du CSV à chaque « Enregistrer »,
+à condition d'avoir connecté le **dossier** partagé (« Choisir le dossier partagé… »).
+
+**Option** : tout fichier `.json` déposé à la main dans `chiffrages-en-attente/` (créé
+automatiquement dans le dossier partagé) est proposé à l'import au démarrage. Bouton
+« 🤖 N chiffrages en attente d'import » ; les fichiers sont supprimés une fois importés.
+
+Limite connue : **tout le monde doit utiliser la nouvelle version de `chiffrage.html`**, sinon une
+ancienne version enregistrerait le CSV sans les colonnes `ia_source` / `ia_justification`.

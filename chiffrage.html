@@ -199,6 +199,7 @@
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
   .ia-flag { margin-left: 4px; font-size: 11px; cursor: help; }
+  .ai-import-title { font-size: 12px; font-weight: 600; color: var(--text); }
 
   .demandes-table {
     width: 100%;
@@ -852,7 +853,19 @@
         <div class="statut-filter-menu hidden" id="statut-filter-menu"></div>
       </div>
       <span class="toolbar-spacer"></span>
+      <button class="btn-icon" onclick="openAiImportForm()" title="Importer un pré-chiffrage Copilot (JSON)">🤖</button>
       <button class="btn-icon btn-icon-primary" onclick="openNewDemandeForm()" title="Nouvelle demande">+</button>
+    </div>
+
+    <div id="ai-import-form" class="new-demande-form hidden">
+      <div class="ai-import-title">🤖 Importer un pré-chiffrage Copilot</div>
+      <textarea id="ai-import-text" rows="6" placeholder="Colle ici le JSON donné par Copilot (un objet, ou une liste [ … ] pour plusieurs demandes)"></textarea>
+      <div class="new-demande-form-actions">
+        <button class="btn-primary" onclick="importAiPasted()">Importer le JSON collé</button>
+        <button class="btn-action" onclick="document.getElementById('ai-import-file').click()">Ou importer un fichier .json…</button>
+        <input type="file" id="ai-import-file" accept=".json,.txt,application/json" multiple class="hidden" onchange="importAiFiles(event)">
+        <button class="btn-action" onclick="closeAiImportForm()">Annuler</button>
+      </div>
     </div>
 
     <div id="new-demande-form" class="new-demande-form hidden">
@@ -2997,6 +3010,100 @@
     try { return JSON.parse(text.slice(start, end + 1)); } catch (e) { return null; }
   }
 
+  // Comme parseAiJson, mais accepte aussi une liste [ {…}, {…} ] ou plusieurs blocs JSON
+  // à la suite (Copilot répond parfois avec un bloc ```json par demande). Renvoie un tableau.
+  function parseAiJsonList(text) {
+    const firstObj = text.indexOf('{'), firstArr = text.indexOf('[');
+    if (firstArr >= 0 && (firstObj < 0 || firstArr < firstObj)) {
+      try {
+        const arr = JSON.parse(text.slice(firstArr, text.lastIndexOf(']') + 1));
+        if (Array.isArray(arr)) return arr.filter(x => x && typeof x === 'object');
+      } catch (e) { /* on tente les autres formes */ }
+    }
+    const single = parseAiJson(text);
+    if (single) return [single];
+    // Plusieurs objets : on découpe sur les accolades de premier niveau (hors chaînes).
+    const out = [];
+    let depth = 0, inStr = false, esc = false, start = -1;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === '{') { if (depth === 0) start = i; depth++; }
+      else if (c === '}' && depth > 0) {
+        depth--;
+        if (depth === 0) { try { out.push(JSON.parse(text.slice(start, i + 1))); } catch (e) { /* bloc invalide ignoré */ } }
+      }
+    }
+    return out;
+  }
+
+  // Ajoute des demandes issues de l'IA : passage dans le calculateur pour obtenir totaux et
+  // mail (comme une saisie à la main), puis enregistrement local. Renvoie les demandes créées.
+  function addAiDemandes(items) {
+    // Une demande peut être ouverte dans le calculateur : on garde ses changements avant de
+    // réutiliser le calculateur pour les demandes importées.
+    if (currentDemandeId) syncCurrentDemandeFromCalculator();
+    const created = [];
+    items.forEach(({ r, source }) => {
+      const d = demandeFromAiResult(r, source);
+      if (!d) return;
+      demandes.push(d);
+      dirtyDemandeIds.add(d.id);
+      saveDemandeurSuggestion(d.demandeur);
+      created.push(d);
+    });
+    created.forEach(d => { openDemande(d.id); syncCurrentDemandeFromCalculator(); });
+    currentDemandeId = null;
+    hideDemandeContextBar();
+    showView('suivi');
+    commitLocal();
+    return created;
+  }
+
+  // ── Import manuel (copier-coller du JSON, ou fichier .json enregistré depuis Copilot) ──
+  function openAiImportForm() {
+    document.getElementById('ai-import-text').value = '';
+    document.getElementById('ai-import-form').classList.remove('hidden');
+    document.getElementById('ai-import-text').focus();
+  }
+  function closeAiImportForm() {
+    document.getElementById('ai-import-form').classList.add('hidden');
+  }
+
+  // Une seule demande importée : on l'ouvre directement pour la relire ; plusieurs : on reste
+  // sur le suivi, où elles apparaissent avec le repère 🤖.
+  function finishAiImport(created, invalidCount) {
+    if (!created.length) {
+      alert('Aucune demande exploitable trouvée' + (invalidCount ? ' (' + invalidCount + ' fichier(s) illisible(s))' : '') + ' : vérifie que c’est bien le JSON donné par Copilot.');
+      return;
+    }
+    closeAiImportForm();
+    if (created.length === 1 && !invalidCount) { openDemande(created[0].id); return; }
+    alert(created.length + ' demande' + (created.length > 1 ? 's importées' : ' importée') + ' (repère 🤖, à relire)'
+      + (invalidCount ? '\n' + invalidCount + ' fichier(s) illisible(s) ignoré(s)' : ''));
+  }
+
+  function importAiPasted() {
+    const list = parseAiJsonList(document.getElementById('ai-import-text').value);
+    const stamp = 'collage-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const created = addAiDemandes(list.map((r, i) => ({ r, source: stamp + (list.length > 1 ? '-' + (i + 1) : '') })));
+    finishAiImport(created, 0);
+  }
+
+  async function importAiFiles(evt) {
+    const files = Array.from(evt.target.files || []);
+    evt.target.value = '';
+    const items = [];
+    let invalid = 0;
+    for (const f of files) {
+      const list = parseAiJsonList(await f.text());
+      if (!list.length) { invalid++; continue; }
+      list.forEach((r, i) => items.push({ r, source: f.name + (list.length > 1 ? '#' + (i + 1) : '') }));
+    }
+    finishAiImport(addAiDemandes(items), invalid);
+  }
+
   // "2,5", "2.5 j", 2.5 → 2.5 arrondi au 0,5 supérieur ; tout le reste → 0.
   function aiDays(v) {
     const n = parseFloat(String(v === undefined || v === null ? '' : v).replace(',', '.'));
@@ -3095,31 +3202,17 @@
   async function importInbox() {
     if (!dirHandle || !fileHandle) return;
     if (!(await verifyPermission(dirHandle, true))) { setFileStatus('Permission refusée sur le dossier.'); return; }
-    // Une demande peut être ouverte dans le calculateur : on garde ses changements avant de
-    // réutiliser le calculateur pour calculer les demandes importées.
-    if (currentDemandeId) syncCurrentDemandeFromCalculator();
-
     const { inbox, files } = await listInboxFiles();
     const known = new Set(demandes.map(d => d.ia_source).filter(Boolean));
-    const imported = [], alreadyKnown = [], invalid = [];
+    const toImport = [], alreadyKnown = [], invalid = [];
     for (const h of files) {
       if (known.has(h.name)) { alreadyKnown.push(h.name); continue; } // déjà importé (ex : suppression ratée la dernière fois)
       let r = null;
       try { r = parseAiJson(await (await h.getFile()).text()); } catch (e) { r = null; }
-      const d = r ? demandeFromAiResult(r, h.name) : null;
-      if (!d) { invalid.push(h.name); await moveToErrors(inbox, h); continue; }
-      demandes.push(d);
-      dirtyDemandeIds.add(d.id);
-      saveDemandeurSuggestion(d.demandeur);
-      imported.push(d);
+      if (!r || !demandeFromAiResult(r, h.name)) { invalid.push(h.name); await moveToErrors(inbox, h); continue; }
+      toImport.push({ r, source: h.name });
     }
-
-    // Passage dans le calculateur pour obtenir totaux et mail, comme une saisie à la main.
-    imported.forEach(d => { openDemande(d.id); syncCurrentDemandeFromCalculator(); });
-    currentDemandeId = null;
-    hideDemandeContextBar();
-    showView('suivi');
-    commitLocal();
+    const imported = addAiDemandes(toImport);
 
     // Publication immédiate dans le CSV ; les JSON ne sont supprimés que si elle a réussi
     // (sinon ils restent là et seront reconnus comme déjà importés la prochaine fois).
