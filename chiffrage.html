@@ -227,7 +227,7 @@
   .demandes-table tbody tr.row-kept { opacity: 0.45; }
   .tbl-input-root.is-forced { border-color: var(--status-waiting); color: var(--status-waiting); }
   .tbl-row-split .tbl-unit .reset-calc { visibility: visible; } /* l'unité "j" est masquée en mode Projet, pas le ↺ */
-  .reset-calc { background: none; border: none; padding: 0; color: var(--status-waiting); cursor: pointer; font-size: 13px; line-height: 1; }
+  .reset-calc { background: none; border: none; padding: 0 0 0 4px; color: var(--status-waiting); cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1; white-space: nowrap; }
   .reset-calc:hover { color: var(--text); }
   .ai-import-title { font-size: 12px; font-weight: 600; color: var(--text); }
 
@@ -274,6 +274,8 @@
   .demandes-table td.demande-actions { width: 1%; }
   .demande-actions-inner { display: grid; grid-template-columns: repeat(2, 26px); gap: 4px; }
   .demande-actions-inner .btn-icon { width: 26px; height: 26px; font-size: 12px; }
+  .demande-actions-row { display: flex; gap: 4px; }
+  .demande-actions-row .btn-icon { width: 26px; height: 26px; font-size: 12px; }
   /* Statut modifiable d'un clic depuis le tableau de suivi */
   .statut-cell .statut-badge { cursor: pointer; }
   .statut-cell .statut-badge:hover { outline: 1px solid currentColor; }
@@ -678,7 +680,8 @@
   .tbl-unit { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-dim); }
 
   /* ── Colonnes Forfait / TMA (type "Projet" uniquement) ── */
-  .tbl-row-split { grid-template-columns: 1fr 64px 14px 64px 14px; }
+  /* Colonnes "unité" assez larges pour afficher "↺ 4,5" (valeur calculée) à côté d'une case forcée. */
+  .tbl-row-split { grid-template-columns: 1fr 64px 40px 64px 40px; }
   .tbl-row-header { padding: 4px 0 8px; border-bottom: 2px solid var(--accent-dim); }
   .col-head { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-mid); letter-spacing: 0.08em; text-transform: uppercase; text-align: right; width: 64px; }
   .col-head:nth-of-type(2) { grid-column: 2; }
@@ -964,8 +967,13 @@
           <tr>
             <th>Client</th>
             <th>Titre</th>
+            <th>Statut</th>
+            <th>Dernière maj</th>
+            <th>Forfait</th>
+            <th>TMA</th>
             <th>Demandeur</th>
             <th>Jira</th>
+            <th>Date demande</th>
             <th></th>
           </tr>
         </thead>
@@ -1039,8 +1047,8 @@
   </div>
 
   <details id="notes-internes-block" class="notes-internes-block hidden" ontoggle="onNotesInternesToggle()">
-    <summary class="demande-detail-label">🔒 Notes internes <span class="notes-internes-hint">— jamais reprises dans le mail</span><span class="notes-internes-flag" id="notes-internes-flag"></span></summary>
-    <textarea id="notes-internes" rows="4" placeholder="Hypothèses, justification du chiffrage, points de vigilance… (visible uniquement ici)" oninput="onNotesInternesInput()"></textarea>
+    <summary class="demande-detail-label">🔒 Notes internes<span class="notes-internes-flag" id="notes-internes-flag"></span></summary>
+    <textarea id="notes-internes" rows="4" placeholder="Hypothèses, justification du chiffrage, points de vigilance…" oninput="onNotesInternesInput()"></textarea>
   </details>
 
   <div id="edit-demande-form" class="new-demande-form hidden">
@@ -1594,7 +1602,7 @@
       <div class="tbl-row tbl-row-split">
         <div>
           <div class="tbl-name">Gestion de projet</div>
-          <div class="tbl-desc"><strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> toute comitologie client (coproj, copil, etc.)</div>
+          <div class="tbl-desc"><strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> Comitologie client (coproj, copil, etc.)</div>
         </div>
         <input type="number" class="tbl-input-root" id="v-gestion-f" value="0" min="0" step="0.5" oninput="markTouched('v-gestion-f'); update();">
         <span class="tbl-unit">j</span>
@@ -1819,7 +1827,7 @@
     const unit = el.nextElementSibling;
     if (unit && unit.classList.contains('tbl-unit')) {
       unit.innerHTML = forced
-        ? `<button type="button" class="reset-calc" title="Revenir au calcul (${fmtNum(calc)} j)" onclick="resetToComputed('${id}')">↺</button>`
+        ? `<button type="button" class="reset-calc" title="Revenir au calcul (${fmtNum(calc)} j)" onclick="resetToComputed('${id}')">↺ ${fmtNum(calc)}</button>`
         : 'j';
     }
   }
@@ -1967,7 +1975,7 @@
     const ateliersDetail = ateliersDetailEl ? styleListsForMail(getFieldRawValue(ateliersDetailEl).trim()) : '';
 
     const items = [
-      { label: 'Gestion de projet', desc: '<strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> toute comitologie client (coproj, copil, etc.)', forfait: gestionForfaitFinal, tma: gestionTMAFinal },
+      { label: 'Gestion de projet', desc: '<strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> Comitologie client (coproj, copil, etc.)', forfait: gestionForfaitFinal, tma: gestionTMAFinal },
       { label: 'Spécification et ateliers', desc: '<strong>Forfait :</strong> ' + nbAteliers + ' atelier' + (nbAteliers > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé' + (ateliersDetail ? '<br><span style="font-style:italic;">' + ateliersDetail + '</span>' : ''), forfait: specForfaitFinal, tma: specTMA },
       { label: 'Installation', desc: '', forfait: installF, tma: installT },
       { label: 'Développement', desc: '', forfait: devF, tma: devT },
@@ -2901,6 +2909,28 @@
     updateStatutFilterToggleLabel();
   }
 
+  // Colonnes communes au Suivi des demandes et aux chiffrages transmis (Commandes) :
+  // client, titre (+ 🤖 / 💬), statut cliquable, dernière maj, forfait, TMA, demandeur, Jira, date.
+  function demandeCoreCells(d) {
+    // Le commentaire est stocké en HTML (mise en forme riche) : on l'affiche ici en texte brut,
+    // sinon la puce/l'infobulle montrerait les balises telles quelles.
+    const commentPlain = d.commentaire ? htmlToPlainText(d.commentaire).trim() : '';
+    const commentTxt = commentPlain ? `<span class="comment-flag" title="${escapeHtml(commentPlain)}">💬</span>` : '';
+    const iaFlag = d.ia_source
+      ? `<span class="ia-flag" title="${escapeHtml('Pré-rempli par l’IA' + (d.ia_justification ? ' — ' + d.ia_justification : ''))}">🤖</span>`
+      : '';
+    return `
+          <td>${escapeHtml(d.client || '')}</td>
+          <td class="demande-cell"><span title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</span>${iaFlag}${commentTxt}</td>
+          <td class="statut-cell" onclick="editStatutInline(this, '${d.id}')" title="Cliquer pour changer le statut">${statutBadge(d.statut)}</td>
+          <td title="${escapeHtml(formatDateFr(d.date_maj))}">${formatDateOnlyFr(d.date_maj)}</td>
+          <td>${fmtCell(d.total_forfait)}</td>
+          <td>${fmtCell(d.total_tma)}</td>
+          <td>${escapeHtml(d.demandeur || '')}</td>
+          <td class="jira-cell">${jiraLink(d.jira)}</td>
+          <td>${formatDateOnlyFr(d.date_creation)}</td>`;
+  }
+
   function renderDemandesTable() {
     const tbody = document.getElementById('demandes-tbody');
     const tfoot = document.getElementById('demandes-tfoot');
@@ -2923,28 +2953,9 @@
       return;
     }
     tbody.innerHTML = sorted.map(d => {
-      const forfaitTxt = fmtCell(d.total_forfait);
-      const tmaTxt = fmtCell(d.total_tma);
-      // Le commentaire est stocké en HTML (mise en forme riche) : on l'affiche ici en texte brut,
-      // sinon la puce/l'infobulle montrerait les balises telles quelles.
-      const commentPlain = d.commentaire ? htmlToPlainText(d.commentaire) : '';
-      const commentTxt = commentPlain.trim()
-        ? `<span class="comment-flag" title="${escapeHtml(commentPlain.trim())}">💬</span>`
-        : '';
-      const iaFlag = d.ia_source
-        ? `<span class="ia-flag" title="${escapeHtml('Pré-rempli par l’IA' + (d.ia_justification ? ' — ' + d.ia_justification : ''))}">🤖</span>`
-        : '';
       return `
         <tr class="${filterStatuts.has(d.statut) ? '' : 'row-kept'}" ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell') && !event.target.closest('.statut-cell')) openDemande('${d.id}')">
-          <td>${escapeHtml(d.client || '')}</td>
-          <td class="demande-cell"><span title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</span>${iaFlag}${commentTxt}</td>
-          <td class="statut-cell" onclick="editStatutInline(this, '${d.id}')" title="Cliquer pour changer le statut">${statutBadge(d.statut)}</td>
-          <td title="${escapeHtml(formatDateFr(d.date_maj))}">${formatDateOnlyFr(d.date_maj)}</td>
-          <td>${forfaitTxt}</td>
-          <td>${tmaTxt}</td>
-          <td>${escapeHtml(d.demandeur || '')}</td>
-          <td class="jira-cell">${jiraLink(d.jira)}</td>
-          <td>${formatDateOnlyFr(d.date_creation)}</td>
+          ${demandeCoreCells(d)}
           <td class="demande-actions"><div class="demande-actions-inner">
             <button class="btn-icon" onclick="openDemande('${d.id}')" title="Ouvrir dans le calculateur">🧮</button>
             <button class="btn-icon" onclick="openDemandeForEdit('${d.id}')" title="Modifier client / titre / demande">✏️</button>
@@ -2981,7 +2992,7 @@
       if (done) return;
       done = true;
       if (apply && sel.value !== d.statut) { keepVisibleIds.add(id); quickStatutChange(id, sel.value); }
-      else renderDemandesTable();
+      else { renderDemandesTable(); renderCommandesView(); } // la liste peut venir de l'un ou l'autre tableau
     };
     sel.addEventListener('change', () => finish(true));
     sel.addEventListener('blur', () => finish(false));
@@ -3017,20 +3028,17 @@
     const rows = demandes.filter(d => d.statut === 'Transmis')
       .sort((a, b) => (a.date_maj || '').localeCompare(b.date_maj || ''));
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Aucun chiffrage transmis en attente de retour.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-row">Aucun chiffrage transmis en attente de retour.</td></tr>`;
       return;
     }
     tbody.innerHTML = rows.map(d => `
-      <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell')) openDemande('${d.id}')">
-        <td>${escapeHtml(d.client || '')}</td>
-        <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
-        <td>${escapeHtml(d.demandeur || '')}</td>
-        <td class="jira-cell">${jiraLink(d.jira)}</td>
-        <td class="demande-actions">
+      <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell') && !event.target.closest('.statut-cell')) openDemande('${d.id}')">
+        ${demandeCoreCells(d)}
+        <td class="demande-actions"><div class="demande-actions-row">
           <button class="btn-icon" onclick="quickStatutChange('${d.id}','Validé')" title="Marquer validé">✅</button>
           <button class="btn-icon btn-icon-danger" onclick="quickStatutChange('${d.id}','Refus')" title="Marquer refusé">❌</button>
           <button class="btn-icon" onclick="quickStatutChange('${d.id}','Abandonné')" title="Marquer abandonné">🚫</button>
-        </td>
+        </div></td>
       </tr>`).join('');
   }
 
@@ -3548,7 +3556,7 @@
     document.getElementById('notes-internes-block').classList.add('hidden');
   }
 
-  // ── Notes internes (jamais reprises dans le mail) ──
+  // ── Notes internes (jamais reprises dans le mail ni dans Jira) ──
   const NOTES_OPEN_LS_KEY = 'chiffrage-notes-internes-ouvertes';
   // Petit repère sur le titre replié quand des notes existent, pour ne pas les oublier.
   function updateNotesInternesFlag(d) {
