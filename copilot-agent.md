@@ -97,7 +97,8 @@ Ce que l'outil en fait :
   Hébergement et environnements sont aussi ajoutés à la fin du résumé de la demande.
   Sans hébergement, l'outil reprend `installation_j` s'il est fourni (sinon 0).
 - `detail_ateliers` → liste reprise dans le mail ; **nombre d'ateliers = nombre de lignes**.
-- `justification` → affichée au survol du repère 🤖.
+- `justification` → copiée dans les **notes internes** (bloc 🔒 repliable sous la demande initiale,
+  jamais repris dans le mail) et affichée au survol du repère 🤖.
 - `points_a_verifier` → mis dans le **commentaire** en bas du calculateur (⚠️ ce commentaire est repris
   dans le mail : à reformuler ou retirer avant envoi).
 - `type` : en `"preconf"`, les jours sont ignorés (forfait fixe).

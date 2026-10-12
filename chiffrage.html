@@ -468,6 +468,34 @@
      aussi rendu visibles les retours à la ligne/indentation du code HTML entre les deux <div>
      (label et texte), d'où le grand espace vide constaté entre eux. */
   .demande-detail-text { white-space: pre-wrap; line-height: 1.5; }
+  .notes-internes-block {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    padding: 10px 16px;
+    margin: -8px 0 16px;
+    font-size: 12px;
+  }
+  .notes-internes-block summary { cursor: pointer; margin-bottom: 0; list-style: none; }
+  .notes-internes-block summary::-webkit-details-marker { display: none; }
+  .notes-internes-block summary::before { content: '▸ '; }
+  .notes-internes-block[open] summary::before { content: '▾ '; }
+  .notes-internes-block[open] summary { margin-bottom: 8px; }
+  .notes-internes-hint { text-transform: none; letter-spacing: 0; }
+  .notes-internes-flag { margin-left: 6px; color: var(--accent); }
+  .notes-internes-block textarea {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    outline: none;
+    resize: vertical;
+  }
+  .notes-internes-block textarea:focus { border-color: var(--accent); }
 
   /* ── Badge coloré pour le statut d'une demande (tableau de suivi) ── */
   .statut-badge {
@@ -962,6 +990,11 @@
     <div class="demande-detail-label">Demande initiale</div>
     <div class="demande-detail-text" id="demande-detail-text"></div>
   </div>
+
+  <details id="notes-internes-block" class="notes-internes-block hidden" ontoggle="onNotesInternesToggle()">
+    <summary class="demande-detail-label">🔒 Notes internes <span class="notes-internes-hint">— jamais reprises dans le mail</span><span class="notes-internes-flag" id="notes-internes-flag"></span></summary>
+    <textarea id="notes-internes" rows="4" placeholder="Hypothèses, justification du chiffrage, points de vigilance… (visible uniquement ici)" oninput="onNotesInternesInput()"></textarea>
+  </details>
 
   <div id="edit-demande-form" class="new-demande-form hidden">
     <input type="text" id="ed-client" placeholder="Client">
@@ -2204,7 +2237,7 @@
   // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
   // ═══════════════════════════════════════════════════════════
 
-  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'mail_texte', 'commentaire', 'commentaire_texte', 'numero_commande', 'temps_passe_forfait', 'temps_passe_tma', 'ia_source', 'ia_justification'];
+  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'mail_texte', 'commentaire', 'commentaire_texte', 'numero_commande', 'temps_passe_forfait', 'temps_passe_tma', 'ia_source', 'ia_justification', 'notes_internes'];
 
   // ── Conversion HTML → texte brut lisible, pour les colonnes CSV destinées à être ouvertes
   // dans Excel (le mail et le commentaire sont stockés en HTML pour l'app, illisibles tels quels
@@ -3190,7 +3223,8 @@
       etat_json: JSON.stringify({ currentType: type, atelierTouched: atelierTouchedState, paramRevealed: paramRevealedState, manualTouched: [], fields }),
       mail_html: '', mail_texte: '', commentaire,
       numero_commande: '', temps_passe_forfait: '', temps_passe_tma: '',
-      ia_source: sourceName, ia_justification: str(r.justification)
+      ia_source: sourceName, ia_justification: str(r.justification),
+      notes_internes: str(r.justification) ? 'Justification de l’IA : ' + str(r.justification) : ''
     };
   }
 
@@ -3356,10 +3390,41 @@
     } else {
       detailBlock.classList.add('hidden');
     }
+
+    // Notes internes : repliées ou dépliées selon le dernier choix (mémorisé sur ce poste).
+    const notesBlock = document.getElementById('notes-internes-block');
+    document.getElementById('notes-internes').value = d.notes_internes || '';
+    updateNotesInternesFlag(d);
+    let open = false;
+    try { open = localStorage.getItem(NOTES_OPEN_LS_KEY) === '1'; } catch (e) { /* stockage indisponible : replié */ }
+    notesBlock.open = open;
+    notesBlock.classList.remove('hidden');
   }
   function hideDemandeContextBar() {
     document.getElementById('demande-context').classList.add('hidden');
     document.getElementById('demande-detail-block').classList.add('hidden');
+    document.getElementById('notes-internes-block').classList.add('hidden');
+  }
+
+  // ── Notes internes (jamais reprises dans le mail) ──
+  const NOTES_OPEN_LS_KEY = 'chiffrage-notes-internes-ouvertes';
+  // Petit repère sur le titre replié quand des notes existent, pour ne pas les oublier.
+  function updateNotesInternesFlag(d) {
+    document.getElementById('notes-internes-flag').textContent = d && (d.notes_internes || '').trim() ? '●' : '';
+  }
+  function onNotesInternesToggle() {
+    try { localStorage.setItem(NOTES_OPEN_LS_KEY, document.getElementById('notes-internes-block').open ? '1' : '0'); } catch (e) {}
+  }
+  function onNotesInternesInput() {
+    if (!currentDemandeId) return;
+    const d = demandes.find(x => x.id === currentDemandeId);
+    if (!d) return;
+    d.notes_internes = document.getElementById('notes-internes').value;
+    d.date_maj = new Date().toISOString();
+    dirtyDemandeIds.add(d.id);
+    persistLocal();
+    updateSyncBadge();
+    updateNotesInternesFlag(d);
   }
 
   // ── Modifier une demande existante (client / titre / texte de la demande) ──
