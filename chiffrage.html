@@ -199,6 +199,11 @@
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
   .ia-flag { margin-left: 4px; font-size: 11px; cursor: help; }
+  .demandes-table tbody tr.row-kept { opacity: 0.45; }
+  .tbl-input-root.is-forced { border-color: var(--status-waiting); color: var(--status-waiting); }
+  .tbl-row-split .tbl-unit .reset-calc { visibility: visible; } /* l'unité "j" est masquée en mode Projet, pas le ↺ */
+  .reset-calc { background: none; border: none; padding: 0; color: var(--status-waiting); cursor: pointer; font-size: 13px; line-height: 1; }
+  .reset-calc:hover { color: var(--text); }
   .ai-import-title { font-size: 12px; font-weight: 600; color: var(--text); }
 
   .demandes-table {
@@ -873,7 +878,7 @@
     </div>
 
     <div class="suivi-toolbar">
-      <input type="text" id="filter-search" class="search-input" placeholder="🔎 Rechercher (titre, demande)…" oninput="onSearchInput()">
+      <input type="text" id="filter-search" class="search-input" placeholder="🔎 Rechercher (client, titre, demande)…" oninput="onSearchInput()">
       <select id="filter-client" onchange="onClientFilterChange()"></select>
       <select id="filter-demandeur" onchange="onDemandeurFilterChange()"></select>
       <div class="statut-filter-dropdown" id="statut-filter-dropdown">
@@ -1482,6 +1487,7 @@
       // enregistrer (en local) plutôt que de compter sur le clic explicite sur Enregistrer.
       syncCurrentDemandeFromCalculator();
       commitLocal();
+      publishIfConnected();
     }
   }
 
@@ -1726,10 +1732,33 @@
   function setNumValue(id, v) { setValue(id, v); }
   // case calculée mais modifiable à la main : pose la valeur calculée par défaut,
   // sauf si l'utilisateur l'a déjà modifiée (elle reste alors telle quelle).
+  const computedValues = {};
   function setComputed(id, v) {
     const el = document.getElementById(id);
     if (!el) return;
+    computedValues[id] = v;
     if (!manualTouched.has(id)) el.value = v;
+    refreshForcedMark(id);
+  }
+  // Case forcée à la main (et différente du calcul) : bordure orange, valeur calculée au survol,
+  // et le "j" à côté devient un ↺ pour revenir au calcul.
+  function refreshForcedMark(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const calc = computedValues[id];
+    const forced = manualTouched.has(id) && (parseFloat(el.value) || 0) !== calc;
+    el.classList.toggle('is-forced', forced);
+    el.title = forced ? 'Modifié à la main (calcul : ' + fmtNum(calc) + ' j)' : '';
+    const unit = el.nextElementSibling;
+    if (unit && unit.classList.contains('tbl-unit')) {
+      unit.innerHTML = forced
+        ? `<button type="button" class="reset-calc" title="Revenir au calcul (${fmtNum(calc)} j)" onclick="resetToComputed('${id}')">↺</button>`
+        : 'j';
+    }
+  }
+  function resetToComputed(id) {
+    manualTouched.delete(id);
+    update();
   }
   // marque une case comme modifiée à la main : elle ne sera plus écrasée par le calcul.
   function markTouched(id) {
@@ -2175,6 +2204,7 @@
     // Copier le mail est, comme afficher l'aperçu, un point de passage naturel pour enregistrer.
     syncCurrentDemandeFromCalculator();
     commitLocal();
+    publishIfConnected();
 
     const blob = new Blob([mailEl.innerHTML], { type: 'text/html' });
     const item = new ClipboardItem({ 'text/html': blob });
@@ -2203,6 +2233,7 @@
 
     syncCurrentDemandeFromCalculator();
     commitLocal();
+    publishIfConnected();
 
     const clone = mailEl.cloneNode(true);
     if (clone.firstElementChild) clone.firstElementChild.remove(); // "Bonjour, ... le total est de ..."
@@ -2604,6 +2635,7 @@
   // ── Navigation entre vues ──
   function showView(view) {
     document.getElementById('view-chiffrage').classList.toggle('hidden', view !== 'chiffrage');
+    if (view === 'suivi') keepVisibleIds.clear();
     document.getElementById('view-suivi').classList.toggle('hidden', view !== 'suivi');
     document.getElementById('view-commandes').classList.toggle('hidden', view !== 'commandes');
     document.getElementById('nav-suivi').classList.toggle('active', view === 'suivi');
@@ -2636,16 +2668,23 @@
   let filterDemandeur = '';
   let filterStatuts = new Set(STATUTS.filter(s => !STATUTS_MASQUES_PAR_DEFAUT.includes(s)));
   let searchQuery = '';
+  // Demandes dont on vient de changer le statut depuis le tableau : elles restent affichées
+  // (grisées) même si le nouveau statut est filtré, jusqu'au prochain changement de filtre ou
+  // retour sur le suivi — sinon la ligne disparaît d'un coup sous la souris.
+  let keepVisibleIds = new Set();
 
   function onClientFilterChange() {
+    keepVisibleIds.clear();
     filterClient = document.getElementById('filter-client').value;
     renderDemandesTable();
   }
   function onDemandeurFilterChange() {
+    keepVisibleIds.clear();
     filterDemandeur = document.getElementById('filter-demandeur').value;
     renderDemandesTable();
   }
   function onStatutFilterChange(checkbox) {
+    keepVisibleIds.clear();
     if (checkbox.checked) filterStatuts.add(checkbox.value);
     else filterStatuts.delete(checkbox.value);
     updateStatutFilterToggleLabel();
@@ -2655,14 +2694,14 @@
     searchQuery = document.getElementById('filter-search').value;
     renderDemandesTable();
   }
-  // Recherche insensible à la casse et aux accents (titre + demande uniquement).
+  // Recherche insensible à la casse et aux accents (client, titre, demande).
   function normalizeSearch(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   }
   function matchesSearch(d, q) {
     const nq = normalizeSearch(q);
     if (!nq) return true;
-    return normalizeSearch(d.titre).includes(nq) || normalizeSearch(d.demande).includes(nq);
+    return normalizeSearch(d.client).includes(nq) || normalizeSearch(d.titre).includes(nq) || normalizeSearch(d.demande).includes(nq);
   }
 
   // ── Tri du tableau : clic sur un en-tête = trie par cette colonne, re-clic = inverse le sens.
@@ -2677,6 +2716,11 @@
   function parseTotalNum(v) {
     const n = parseFloat(String(v || '').replace(',', '.'));
     return isNaN(n) ? 0 : n;
+  }
+  // Cellule de tableau : nombre seul (les anciennes valeurs stockées "6 jours" / "6 j" sont
+  // normalisées à l'affichage) ; l'unité n'apparaît que sur les lignes Total.
+  function fmtCell(v) {
+    return v === undefined || v === null || String(v).trim() === '' ? '—' : fmtNum(parseTotalNum(v));
   }
   function sortValue(d, col) {
     switch (col) {
@@ -2774,7 +2818,7 @@
     const filtered = demandes.filter(d =>
       (!filterClient || d.client === filterClient) &&
       (!filterDemandeur || d.demandeur === filterDemandeur) &&
-      filterStatuts.has(d.statut) &&
+      (filterStatuts.has(d.statut) || keepVisibleIds.has(d.id)) &&
       matchesSearch(d, searchQuery)
     );
     const sorted = filtered.sort((a, b) => compareDemandes(a, b, sortColumn, sortDir));
@@ -2786,8 +2830,8 @@
       return;
     }
     tbody.innerHTML = sorted.map(d => {
-      const forfaitTxt = d.total_forfait ? escapeHtml(d.total_forfait) : '—';
-      const tmaTxt = d.total_tma ? escapeHtml(d.total_tma) : '—';
+      const forfaitTxt = fmtCell(d.total_forfait);
+      const tmaTxt = fmtCell(d.total_tma);
       // Le commentaire est stocké en HTML (mise en forme riche) : on l'affiche ici en texte brut,
       // sinon la puce/l'infobulle montrerait les balises telles quelles.
       const commentPlain = d.commentaire ? htmlToPlainText(d.commentaire) : '';
@@ -2798,11 +2842,11 @@
         ? `<span class="ia-flag" title="${escapeHtml('Pré-rempli par l’IA' + (d.ia_justification ? ' — ' + d.ia_justification : ''))}">🤖</span>`
         : '';
       return `
-        <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell') && !event.target.closest('.statut-cell')) openDemande('${d.id}')">
+        <tr class="${filterStatuts.has(d.statut) ? '' : 'row-kept'}" ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell') && !event.target.closest('.statut-cell')) openDemande('${d.id}')">
           <td>${escapeHtml(d.client || '')}</td>
           <td class="demande-cell"><span title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</span>${iaFlag}${commentTxt}</td>
           <td class="statut-cell" onclick="editStatutInline(this, '${d.id}')" title="Cliquer pour changer le statut">${statutBadge(d.statut)}</td>
-          <td>${formatDateFr(d.date_maj)}</td>
+          <td title="${escapeHtml(formatDateFr(d.date_maj))}">${formatDateOnlyFr(d.date_maj)}</td>
           <td>${forfaitTxt}</td>
           <td>${tmaTxt}</td>
           <td>${escapeHtml(d.demandeur || '')}</td>
@@ -2823,8 +2867,8 @@
       tfoot.innerHTML = `
         <tr>
           <td colspan="4" class="foot-label">Total (${sorted.length} demande${sorted.length > 1 ? 's' : ''} affichée${sorted.length > 1 ? 's' : ''})</td>
-          <td>${fmt(sumForfait)}</td>
-          <td>${fmt(sumTMA)}</td>
+          <td>${fmtJour(sumForfait)}</td>
+          <td>${fmtJour(sumTMA)}</td>
           <td colspan="4"></td>
         </tr>`;
     }
@@ -2843,7 +2887,7 @@
     const finish = (apply) => {
       if (done) return;
       done = true;
-      if (apply && sel.value !== d.statut) quickStatutChange(id, sel.value);
+      if (apply && sel.value !== d.statut) { keepVisibleIds.add(id); quickStatutChange(id, sel.value); }
       else renderDemandesTable();
     };
     sel.addEventListener('change', () => finish(true));
@@ -2871,6 +2915,7 @@
     dirtyDemandeIds.add(id);
     commitLocal(); // rafraîchit aussi le tableau de suivi des demandes (la ligne y change de statut)
     renderCommandesView();
+    publishIfConnected();
   }
 
   function renderCommandesATraiter() {
@@ -2922,8 +2967,8 @@
         <td>${escapeHtml(d.client || '')}</td>
         <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
         <td><input type="text" class="inline-cell-input inline-cell-text" value="${escapeHtml(d.numero_commande || '')}" placeholder="—" onchange="onCommandeFieldChange('${d.id}','numero_commande',this.value)"></td>
-        <td>${d.total_forfait ? escapeHtml(d.total_forfait) : '—'}</td>
-        <td>${d.total_tma ? escapeHtml(d.total_tma) : '—'}</td>
+        <td>${fmtCell(d.total_forfait)}</td>
+        <td>${fmtCell(d.total_tma)}</td>
         <td><input type="number" class="inline-cell-input" min="0" step="0.5" value="${escapeHtml(d.temps_passe_forfait || '')}" placeholder="0" onchange="onCommandeFieldChange('${d.id}','temps_passe_forfait',this.value)"></td>
         <td><input type="number" class="inline-cell-input" min="0" step="0.5" value="${escapeHtml(d.temps_passe_tma || '')}" placeholder="0" onchange="onCommandeFieldChange('${d.id}','temps_passe_tma',this.value)"></td>
         <td id="diff-f-${d.id}">${diffCellHtml(d.total_forfait, d.temps_passe_forfait)}</td>
@@ -2938,10 +2983,10 @@
       tfoot.innerHTML = `
         <tr>
           <td colspan="3" class="foot-label">Total (${rows.length} commande${rows.length > 1 ? 's' : ''})</td>
-          <td>${fmt(sumVenduF)}</td>
-          <td>${fmt(sumVenduT)}</td>
-          <td>${fmt(sumPasseF)}</td>
-          <td>${fmt(sumPasseT)}</td>
+          <td>${fmtJour(sumVenduF)}</td>
+          <td>${fmtJour(sumVenduT)}</td>
+          <td>${fmtJour(sumPasseF)}</td>
+          <td>${fmtJour(sumPasseT)}</td>
           <td>${diffCellHtml(sumVenduF, sumPasseF)}</td>
           <td>${diffCellHtml(sumVenduT, sumPasseT)}</td>
         </tr>`;
@@ -3472,17 +3517,28 @@
     commitLocal();
   }
 
-  // "Enregistrer" dans la barre de contexte du calculateur ne fait que committer en local —
-  // la publication vers le fichier partagé reste une action à part, depuis la vue Suivi.
+  // Publie aussi dans le fichier partagé, si un fichier est connecté et déjà autorisé (aucune
+  // demande de permission ici : sinon on reste en local, et le badge ● le signale).
+  // Appelé à chaque "point d'enregistrement" : Enregistrer, aperçu/copie du mail, retour au suivi.
+  async function publishIfConnected() {
+    if (!fileHandle) return;
+    try {
+      if ((await fileHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') return;
+    } catch (e) { return; }
+    await saveDemandes();
+  }
+
   function manualSave() {
     if (!currentDemandeId) return;
     syncCurrentDemandeFromCalculator();
     commitLocal();
+    publishIfConnected();
   }
 
   function backToSuivi() {
     if (currentDemandeId) syncCurrentDemandeFromCalculator();
     commitLocal();
+    publishIfConnected();
     currentDemandeId = null;
     hideDemandeContextBar();
     cancelEditDemandeForm();
@@ -3502,16 +3558,14 @@
     };
   }
 
+  // Total stocké sur la demande : toujours un nombre seul ("11,5"), quel que soit le type
+  // (le Préconf stockait auparavant le texte affiché, "6 jours").
   function readCurrentTotal(kind) {
-    if (currentType === 'normal') {
-      const el = document.getElementById(kind === 'forfait' ? 'v-total-forfait-col' : 'v-total-tma-col');
-      return el ? el.textContent.trim() : '';
-    }
-    if (kind === 'forfait') {
-      const el = document.getElementById('total-display');
-      return el ? el.textContent.trim() : '';
-    }
-    return '';
+    let el = null;
+    if (currentType === 'normal') el = document.getElementById(kind === 'forfait' ? 'v-total-forfait-col' : 'v-total-tma-col');
+    else if (kind === 'forfait') el = document.getElementById('total-display');
+    const txt = el ? el.textContent.trim() : '';
+    return txt && txt !== '—' ? fmtNum(parseTotalNum(txt)) : '';
   }
 
   function syncCurrentDemandeFromCalculator() {
