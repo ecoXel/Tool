@@ -253,7 +253,13 @@
   .card-jira .card-input { width: 140px; }
   .card-jira-link { color: var(--accent); text-decoration: none; font-size: 14px; padding: 0 4px; }
   .card-jira-link:hover { color: var(--text); }
-  .demande-card .notes-internes-block { margin: 0; padding: 10px 12px; }
+  /* Dans la carte, les notes se présentent comme la description (texte modifiable au clic),
+     avec en plus le repli. */
+  .demande-card .notes-internes-block { margin: 0; padding: 0; border: none; background: none; }
+  .demande-card .notes-internes-block[open] summary { margin-bottom: 2px; }
+  .demande-card .notes-internes-block textarea.card-input { background: transparent; border-color: transparent; padding: 4px 6px; font-size: 13px; color: var(--text-mid); resize: none; overflow: hidden; }
+  .demande-card .notes-internes-block textarea.card-input:hover { border-color: var(--border); }
+  .demande-card .notes-internes-block textarea.card-input:focus { border-color: var(--accent); background: var(--bg); }
   @media (max-width: 700px) { .card-meta { grid-template-columns: repeat(2, 1fr); } .card-client { width: 100%; } }
   .nd-type-choice { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-mid); }
   .nd-type-choice label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
@@ -1122,7 +1128,7 @@
     </div>
     <details id="notes-internes-block" class="notes-internes-block" ontoggle="onNotesInternesToggle()">
       <summary class="card-label">🔒 Notes internes<span class="notes-internes-flag" id="notes-internes-flag"></span></summary>
-      <textarea id="notes-internes" rows="4" placeholder="Hypothèses, justification du chiffrage, points de vigilance…" oninput="onNotesInternesInput()"></textarea>
+      <textarea id="notes-internes" class="card-input card-textarea" rows="2" placeholder="Hypothèses, justification du chiffrage, points de vigilance…" oninput="autoGrow(this); onNotesInternesInput()"></textarea>
     </details>
   </div>
 
@@ -3604,6 +3610,7 @@
     let open = false;
     try { open = localStorage.getItem(NOTES_OPEN_LS_KEY) === '1'; } catch (e) { /* stockage indisponible : replié */ }
     notesBlock.open = open;
+    if (open) autoGrow(document.getElementById('notes-internes'));
   }
   function hideDemandeContextBar() {
     document.getElementById('demande-card').classList.add('hidden');
@@ -3654,7 +3661,9 @@
     document.getElementById('notes-internes-flag').textContent = d && (d.notes_internes || '').trim() ? '●' : '';
   }
   function onNotesInternesToggle() {
-    try { localStorage.setItem(NOTES_OPEN_LS_KEY, document.getElementById('notes-internes-block').open ? '1' : '0'); } catch (e) {}
+    const open = document.getElementById('notes-internes-block').open;
+    try { localStorage.setItem(NOTES_OPEN_LS_KEY, open ? '1' : '0'); } catch (e) {}
+    if (open) autoGrow(document.getElementById('notes-internes'));
   }
   function onNotesInternesInput() {
     if (!currentDemandeId) return;
