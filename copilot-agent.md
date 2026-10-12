@@ -117,6 +117,15 @@ Une seule demande importée s'ouvre directement dans le calculateur pour relectu
 apparaissent dans le Suivi. Elles ont le statut « Demande » et le repère 🤖, avec la justification
 au survol. Comme pour une saisie à la main, elles sont en local jusqu'à « Enregistrer ».
 
+**Mettre à jour une demande existante** (nouvelles infos du commerce) :
+1. Dans la demande, bouton **📋 Copier pour l'IA** : copie le chiffrage actuel au format JSON, les
+   notes internes (justifications précédentes), le commentaire et la consigne de mise à jour.
+2. Colle-le dans Copilot, suivi du nouveau mail.
+3. Bouton **🤖 Réimporter** : colle la réponse, vérifie l'aperçu (avant → après), choisis
+   **Écraser** ou **Nouvelle version** (l'actuelle est gardée au statut « Archivé »).
+   Un champ absent du JSON n'est pas modifié ; client, titre, demandeur, statut, Jira et lignes
+   forcées à la main ne le sont jamais.
+
 **Historique pour l'agent** : `historique-ia.csv` est réécrit à côté du CSV à chaque « Enregistrer »,
 à condition d'avoir connecté le **dossier** partagé (« Choisir le dossier partagé… »).
 

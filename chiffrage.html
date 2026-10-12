@@ -1108,6 +1108,7 @@
       <select id="ctx-statut" class="card-statut" onchange="onStatutChange()"></select>
       <span class="card-ia hidden" id="dc-ia">🤖 pré-rempli par l’IA</span>
       <span class="card-spacer"></span>
+      <button class="btn-action" id="btn-copy-ai" onclick="copyForAi()" title="Copier le chiffrage actuel (JSON, notes, commentaire) pour le redonner à Copilot avec de nouvelles infos">📋 Copier pour l’IA</button>
       <button class="btn-action" onclick="openReimport()" title="Mettre à jour cette demande avec un nouveau JSON Copilot">🤖 Réimporter</button>
       <button class="btn-action" onclick="duplicateDemande(currentDemandeId)" title="Créer une nouvelle demande à partir de ce chiffrage">📑 Dupliquer</button>
     </div>
@@ -3715,6 +3716,70 @@
   }
 
   // Calcule ce que le réimport changerait, et l'affiche (flèches avant → après).
+  // Texte brut d'un champ riche, avec des puces "- " (format attendu par l'agent).
+  function richToAiText(html) {
+    return htmlToPlainText(html || '').split('\n').map(l => l.replace(/^\s*•\s*/, '- ')).join('\n').trim();
+  }
+
+  // Chiffrage actuel au format JSON de l'agent, pour une mise à jour par Copilot.
+  function currentDemandeAsAiJson(d) {
+    const f = stateFields(d).fields;
+    const isProjet = d.type === 'normal';
+    const heb = (String(d.demande || '').match(/Hébergement : ([^—\n]+)/) || [])[1] || '';
+    const description = String(d.demande || '').replace(/\n*Hébergement : [^\n]*$/, '').trim();
+    const num = (id) => parseTotalNum(f[id]);
+    return {
+      client: d.client || '', titre: d.titre || '', demandeur: d.demandeur || '',
+      demande: description,
+      type: isProjet ? 'projet' : 'preconf',
+      hebergement: heb.trim(),
+      environnements_hors_prod: f['in-env'] !== undefined ? parseInt(f['in-env'], 10) || 0 : 1,
+      parametrage_j: isProjet ? num('in-config') : 0,
+      installation_j: isProjet ? num('in-install') : 0,
+      developpement_j: isProjet ? num('in-dev') : 0,
+      connecteurs_j: isProjet ? num('in-connecteurs-f') : 0,
+      detail_parametrage: richToAiText(f['in-detail']),
+      detail_connecteurs: richToAiText(f['in-connecteurs-detail']),
+      detail_ateliers: richToAiText(f['in-ateliers-detail']),
+      justification: d.ia_justification || '',
+      points_a_verifier: ''
+    };
+  }
+
+  function copyForAi() {
+    if (!currentDemandeId) return;
+    syncCurrentDemandeFromCalculator();
+    const d = demandes.find(x => x.id === currentDemandeId);
+    if (!d) return;
+    const commentTxt = richToAiText(d.commentaire);
+    const text = [
+      'Voici un chiffrage DocuWare existant. De nouvelles informations sont arrivées (ci-dessous) :',
+      'mets ce chiffrage à jour en suivant tes instructions habituelles.',
+      '- Renvoie le JSON COMPLET, au même format, avec toutes les clés (y compris celles qui ne changent pas).',
+      '- Garde ce qui reste valable ; ne modifie que ce que les nouvelles informations justifient.',
+      '- Dans "justification", explique ce qui change par rapport à la version actuelle et pourquoi.',
+      '',
+      'Chiffrage actuel (total actuel : ' + (fmtCell(d.total_forfait) || '—') + ' j au forfait, ' + (fmtCell(d.total_tma) || '—') + ' j en TMA) :',
+      '```json',
+      JSON.stringify(currentDemandeAsAiJson(d), null, 2),
+      '```',
+      '',
+      'Notes internes (justifications et réflexions précédentes) :',
+      (d.notes_internes || '').trim() || '(aucune)',
+      '',
+      'Commentaire actuel (points à vérifier, remarques) :',
+      commentTxt || '(aucun)',
+      '',
+      'Nouvelles informations :',
+      ''
+    ].join('\n');
+    const btn = document.getElementById('btn-copy-ai');
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copié !';
+      setTimeout(() => { btn.textContent = '📋 Copier pour l’IA'; }, 2000);
+    }).catch(() => showToast('Copie impossible dans le presse-papiers.', 'error'));
+  }
+
   function previewReimport(sourceName) {
     const box = document.getElementById('reimport-preview');
     const btn = document.getElementById('btn-apply-reimport');
@@ -3724,7 +3789,8 @@
     const txt = document.getElementById('reimport-text').value;
     if (!d || !txt.trim()) { box.innerHTML = ''; return; }
     const list = parseAiJsonList(txt);
-    const nd = list.length ? demandeFromAiResult(list[0], sourceName || 'reimport') : null;
+    // Client/titre de la demande en secours : un JSON partiel (ex. seulement les jours) reste valable.
+    const nd = list.length ? demandeFromAiResult(Object.assign({ client: d.client, titre: d.titre }, list[0]), sourceName || 'reimport') : null;
     if (!nd) { box.innerHTML = '<div class="reimport-warn">Pas de JSON Copilot exploitable dans ce texte.</div>'; return; }
 
     if (currentDemandeId) syncCurrentDemandeFromCalculator(); // comparer avec l'état réellement à l'écran
@@ -3736,35 +3802,47 @@
     const isProjet = d.type === 'normal';
     if (nd.type !== d.type) notes.push('Type « ' + (nd.type === 'preconf' ? 'Préconf' : 'Projet') + ' » du JSON ignoré : la demande reste en ' + (isProjet ? 'Projet' : 'Préconf') + '.');
     const plan = {};
+    // Une clé absente du JSON ne touche à rien (Copilot peut ne renvoyer que ce qui change) ;
+    // une clé présente, même vide ou à 0, remplace la valeur actuelle.
+    const r = list[0];
+    const has = (k) => Object.prototype.hasOwnProperty.call(r, k);
+    const SOURCE_KEYS = {
+      'in-config': ['parametrage_j'], 'in-install': ['installation_j', 'hebergement', 'environnement'],
+      'in-dev': ['developpement_j'], 'in-connecteurs-f': ['connecteurs_j'],
+      'in-detail': ['detail_parametrage'], 'in-connecteurs-detail': ['detail_connecteurs'], 'in-ateliers-detail': ['detail_ateliers']
+    };
+    const provided = (id) => SOURCE_KEYS[id].some(has);
     if (isProjet) {
-      REIMPORT_DAYS.forEach(([id, label]) => {
+      REIMPORT_DAYS.filter(([id]) => provided(id)).forEach(([id, label]) => {
         const a = parseTotalNum(oldF[id]), b = parseTotalNum(newF[id]);
         plan[id] = String(b);
         if (a !== b) lines.push(`<li><b>${label}</b> : ${fmtNum(a)} j → <b>${fmtNum(b)} j</b></li>`);
       });
-      if (newF['in-env'] !== undefined) {
+      if (newF['in-env'] !== undefined && has('environnements_hors_prod')) {
         const a = oldF['in-env'] !== undefined ? parseInt(oldF['in-env'], 10) : 1, b = parseInt(newF['in-env'], 10);
         plan['in-env'] = String(b);
         if (a !== b) lines.push(`<li><b>Environnements hors prod</b> : ${a} → <b>${b}</b></li>`);
       }
-      if (newF['in-ateliers'] !== undefined) {
+      if (newF['in-ateliers'] !== undefined && has('detail_ateliers')) {
         const a = oldF['in-ateliers'] !== undefined ? parseInt(oldF['in-ateliers'], 10) : null, b = parseInt(newF['in-ateliers'], 10);
         plan['in-ateliers'] = String(b);
         if (a !== b) lines.push(`<li><b>Ateliers</b> : ${a === null ? 'par défaut' : a} → <b>${b}</b></li>`);
       }
-      REIMPORT_TEXTS.forEach(([id, label]) => {
+      REIMPORT_TEXTS.filter(([id]) => provided(id)).forEach(([id, label]) => {
         const a = htmlToPlainText(oldF[id] || '').trim(), b = htmlToPlainText(newF[id] || '').trim();
         plan[id] = newF[id] || '';
         if (a !== b) lines.push(`<li><b>${label}</b> : ${b ? (a ? 'modifié' : 'ajouté') : 'vidé'}</li>`);
       });
     }
+    if (!has('demande') || !String(r.demande || '').trim()) nd.demande = ''; // description absente : on garde l'actuelle
     if (nd.demande && nd.demande !== (d.demande || '')) lines.push('<li><b>Description du besoin</b> : remplacée</li>');
     if (nd.commentaire) lines.push('<li><b>Points à vérifier</b> : ajoutés au commentaire</li>');
+    if (nd.ia_justification === (d.ia_justification || '')) nd.ia_justification = ''; // même justification : rien à ajouter
     if (nd.ia_justification) lines.push('<li><b>Justification</b> : ajoutée aux notes internes</li>');
 
     box.innerHTML = (lines.length ? '<ul>' + lines.join('') + '</ul>' : '<div class="reimport-warn">Aucun changement par rapport à la demande actuelle.</div>')
       + notes.map(n => `<div class="reimport-warn">${escapeHtml(n)}</div>`).join('')
-      + '<div class="reimport-hint">Inchangés : client, titre, demandeur, statut, Jira, lignes modifiées à la main.</div>';
+      + '<div class="reimport-hint">Inchangés : client, titre, demandeur, statut, Jira, lignes modifiées à la main, et tout champ absent du JSON.</div>';
     if (lines.length) {
       reimportPending = { nd, plan, source: sourceName || ('reimport-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)) };
       btn.disabled = false;
@@ -3797,7 +3875,7 @@
     Object.assign(fields, plan);
     const newState = Object.assign({ currentType: d.type, manualTouched: [] }, st, { fields });
     if (plan['in-ateliers'] !== undefined) newState.atelierTouched = true;
-    if (d.type === 'normal' && parseTotalNum(plan['in-config']) + parseTotalNum(plan['in-install']) + parseTotalNum(plan['in-dev']) > 0) newState.paramRevealed = true;
+    if (d.type === 'normal' && parseTotalNum(fields['in-config']) + parseTotalNum(fields['in-install']) + parseTotalNum(fields['in-dev']) > 0) newState.paramRevealed = true;
     d.etat_json = JSON.stringify(newState);
     if (nd.demande) d.demande = nd.demande;
     if (nd.commentaire) d.commentaire = (d.commentaire ? d.commentaire + '<br>' : '') + nd.commentaire;
