@@ -199,6 +199,62 @@
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
   .ia-flag { margin-left: 4px; font-size: 11px; cursor: help; }
+  .demande-card {
+    background: var(--surface);
+    border: 1px solid var(--accent-dim);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card-spacer { flex: 1; }
+  .card-input {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    padding: 4px 6px;
+    margin-left: -7px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .card-input:hover { border-color: var(--border); }
+  .card-input:focus { border-color: var(--accent); background: var(--bg); }
+  .card-input::placeholder { color: var(--text-dim); }
+  .card-client { width: 280px; font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; color: var(--accent); }
+  .card-titre { font-size: 15px; font-weight: 500; }
+  .card-textarea { resize: none; line-height: 1.5; overflow: hidden; color: var(--text-mid); }
+  .card-statut {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 8px;
+    outline: none;
+  }
+  .card-ia { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim); cursor: help; }
+  .card-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .card-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .card-static { font-size: 13px; color: var(--text-mid); padding: 5px 0; }
+  .card-jira { display: flex; align-items: center; gap: 4px; }
+  .card-jira .card-input { width: 140px; }
+  .card-jira-link { color: var(--accent); text-decoration: none; font-size: 14px; padding: 0 4px; }
+  .card-jira-link:hover { color: var(--text); }
+  .demande-card .notes-internes-block { margin: 0; padding: 10px 12px; }
+  @media (max-width: 700px) { .card-meta { grid-template-columns: repeat(2, 1fr); } .card-client { width: 100%; } }
   .nd-type-choice { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-mid); }
   .nd-type-choice label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
   .type-zone-hint { font-size: 12px; color: var(--status-waiting); margin-bottom: 8px; }
@@ -240,14 +296,14 @@
   }
   .demandes-table th, .demandes-table td {
     text-align: left;
-    padding: 10px 12px;
+    padding: 10px 8px;
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
   .demandes-table th {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--text-dim);
   }
@@ -263,8 +319,9 @@
     border-top: 2px solid var(--border);
     background: var(--surface);
   }
+  .demandes-table tfoot td { white-space: nowrap; }
   .demandes-table tfoot .foot-label { color: var(--text-dim); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
-  .demande-cell { max-width: 320px; }
+  .demande-cell { max-width: 320px; min-width: 120px; }
   /* Commentaire : plus de colonne dédiée, juste une pastille 💬 après le titre, texte en infobulle. */
   .comment-flag { margin-left: 4px; font-size: 11px; cursor: help; opacity: 0.8; }
   .comment-flag:hover { opacity: 1; }
@@ -1025,41 +1082,48 @@
 
   <div id="view-chiffrage" class="hidden">
 
-  <div id="demande-context" class="demande-context hidden">
-    <div class="demande-context-info">
-      <span class="demande-context-client" id="ctx-client"></span>
-      <span class="demande-context-req" id="ctx-demande"></span>
-      <span class="demande-context-meta" id="ctx-meta"></span>
-      <span id="ctx-jira"></span>
-    </div>
-    <div class="demande-context-actions">
-      <select id="ctx-statut" onchange="onStatutChange()"></select>
-      <button class="btn-action" onclick="openEditDemandeForm()">✏️ Modifier</button>
-      <button class="btn-action" onclick="manualSave()">💾 Enregistrer</button>
+  <div id="demande-card" class="demande-card hidden">
+    <div class="card-top">
+      <input type="text" id="dc-client" class="card-input card-client" placeholder="Client" onchange="onCardFieldChange('client', this)">
+      <select id="ctx-statut" class="card-statut" onchange="onStatutChange()"></select>
+      <span class="card-ia hidden" id="dc-ia">🤖 pré-rempli par l’IA</span>
+      <span class="card-spacer"></span>
+      <button class="btn-action" onclick="openReimport()" title="Mettre à jour cette demande avec un nouveau JSON Copilot">🤖 Réimporter</button>
       <button class="btn-action" onclick="duplicateDemande(currentDemandeId)" title="Créer une nouvelle demande à partir de ce chiffrage">📑 Dupliquer</button>
-      <button class="btn-action" onclick="backToSuivi()">◀ Retour au suivi</button>
     </div>
-  </div>
-
-  <div id="demande-detail-block" class="demande-detail-block hidden">
-    <div class="demande-detail-label">Demande initiale</div>
-    <div class="demande-detail-text" id="demande-detail-text"></div>
-  </div>
-
-  <details id="notes-internes-block" class="notes-internes-block hidden" ontoggle="onNotesInternesToggle()">
-    <summary class="demande-detail-label">🔒 Notes internes<span class="notes-internes-flag" id="notes-internes-flag"></span></summary>
-    <textarea id="notes-internes" rows="4" placeholder="Hypothèses, justification du chiffrage, points de vigilance…" oninput="onNotesInternesInput()"></textarea>
-  </details>
-
-  <div id="edit-demande-form" class="new-demande-form hidden">
-    <input type="text" id="ed-client" placeholder="Client">
-    <input type="text" id="ed-titre" placeholder="Titre (ce qui s'affichera dans le tableau)">
-    <input type="text" id="ed-jira" placeholder="Ticket Jira (ex : INTE-4715)">
-    <textarea id="ed-demande" rows="2" placeholder="Demande initiale du client"></textarea>
-    <div class="new-demande-form-actions">
-      <button class="btn-primary" onclick="saveEditDemandeForm()">Enregistrer les modifications</button>
-      <button class="btn-action" onclick="cancelEditDemandeForm()">Annuler</button>
+    <div class="card-meta">
+      <div class="card-field">
+        <div class="card-label">Demandeur</div>
+        <input type="text" id="dc-demandeur" class="card-input" list="demandeur-suggestions" placeholder="—" onchange="onCardFieldChange('demandeur', this)">
+      </div>
+      <div class="card-field">
+        <div class="card-label">Date de la demande</div>
+        <div class="card-static" id="dc-date-creation"></div>
+      </div>
+      <div class="card-field">
+        <div class="card-label">Dernière modif</div>
+        <div class="card-static" id="dc-date-maj"></div>
+      </div>
+      <div class="card-field">
+        <div class="card-label">Ticket Jira</div>
+        <div class="card-jira">
+          <input type="text" id="dc-jira" class="card-input" placeholder="—" onchange="onCardFieldChange('jira', this)">
+          <a id="dc-jira-link" class="card-jira-link hidden" target="_blank" rel="noopener" title="Ouvrir dans Jira">↗</a>
+        </div>
+      </div>
     </div>
+    <div class="card-field">
+      <div class="card-label">Titre</div>
+      <input type="text" id="dc-titre" class="card-input card-titre" placeholder="Titre (affiché dans le tableau)" onchange="onCardFieldChange('titre', this)">
+    </div>
+    <div class="card-field">
+      <div class="card-label">Description du besoin</div>
+      <textarea id="dc-demande" class="card-input card-textarea" rows="2" placeholder="Demande initiale du client" oninput="autoGrow(this)" onchange="onCardFieldChange('demande', this)"></textarea>
+    </div>
+    <details id="notes-internes-block" class="notes-internes-block" ontoggle="onNotesInternesToggle()">
+      <summary class="card-label">🔒 Notes internes<span class="notes-internes-flag" id="notes-internes-flag"></span></summary>
+      <textarea id="notes-internes" rows="4" placeholder="Hypothèses, justification du chiffrage, points de vigilance…" oninput="onNotesInternesInput()"></textarea>
+    </details>
   </div>
 
   <div id="type-zone" class="hidden">
@@ -1873,6 +1937,7 @@
 
   function update() {
     if (!currentType) return;
+    scheduleAutoSync();
 
     if (!paramRevealed) {
       if (hasAnyParam()) revealFull();
@@ -2733,6 +2798,7 @@
   // nav : entrée de menu à surligner ; par défaut, une demande ouverte dans le calculateur
   // reste rattachée à "Demandes" (les calculateurs vierges passent 'preconf' / 'normal').
   function showView(view, nav) {
+    if (view !== 'chiffrage' && currentDemandeId) leaveCurrentDemande();
     ['chiffrage', 'suivi', 'commandes', 'param'].forEach(v => {
       document.getElementById('view-' + v).classList.toggle('hidden', view !== v);
     });
@@ -2956,9 +3022,8 @@
       return `
         <tr class="${filterStatuts.has(d.statut) ? '' : 'row-kept'}" ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell') && !event.target.closest('.statut-cell')) openDemande('${d.id}')">
           ${demandeCoreCells(d)}
-          <td class="demande-actions"><div class="demande-actions-inner">
-            <button class="btn-icon" onclick="openDemande('${d.id}')" title="Ouvrir dans le calculateur">🧮</button>
-            <button class="btn-icon" onclick="openDemandeForEdit('${d.id}')" title="Modifier client / titre / demande">✏️</button>
+          <td class="demande-actions"><div class="demande-actions-row">
+            <button class="btn-icon" onclick="openDemande('${d.id}')" title="Ouvrir">🧮</button>
             <button class="btn-icon" onclick="duplicateDemande('${d.id}')" title="Dupliquer ce chiffrage">📑</button>
             <button class="btn-icon btn-icon-danger" onclick="deleteDemande('${d.id}')" title="Supprimer">🗑️</button>
           </div></td>
@@ -3507,39 +3572,30 @@
     demandes.push(d);
     dirtyDemandeIds.add(d.id);
     commitLocal();
-    // On ouvre directement la copie avec le formulaire de modification : en pratique on
-    // veut presque toujours renommer le titre / changer de client juste après.
-    openDemandeForEdit(d.id);
+    // On ouvre directement la copie, curseur dans le titre : en pratique on veut presque
+    // toujours le renommer juste après.
+    openDemande(d.id);
+    document.getElementById('dc-titre').focus();
+    document.getElementById('dc-titre').select();
   }
 
-  // ── Barre de contexte "demande ouverte" au-dessus du calculateur ──
+  // ── Carte "demande ouverte" au-dessus du calculateur : tout y est modifiable sur place ──
   function showDemandeContextBar(d) {
-    document.getElementById('demande-context').classList.remove('hidden');
-    document.getElementById('ctx-client').textContent = d.client || '(sans nom)';
-    const ctxDemandeEl = document.getElementById('ctx-demande');
-    ctxDemandeEl.textContent = d.titre || d.demande || '';
-    ctxDemandeEl.title = d.demande || '';
-    const metaParts = [];
-    if (d.demandeur) metaParts.push('Demandeur : ' + d.demandeur);
-    if (d.date_creation) metaParts.push('créée le ' + formatDateOnlyFr(d.date_creation));
-    if (d.ia_source) metaParts.push('🤖 pré-rempli par l’IA');
-    const ctxMeta = document.getElementById('ctx-meta');
-    ctxMeta.textContent = metaParts.join(' · ');
-    ctxMeta.title = d.ia_justification ? 'Justification de l’IA : ' + d.ia_justification : '';
-    document.getElementById('ctx-jira').innerHTML = d.jira ? jiraLink(d.jira) : '';
+    document.getElementById('demande-card').classList.remove('hidden');
+    document.getElementById('dc-client').value = d.client || '';
+    document.getElementById('dc-demandeur').value = d.demandeur || '';
+    document.getElementById('dc-titre').value = d.titre || '';
+    document.getElementById('dc-jira').value = d.jira || '';
+    const demandeEl = document.getElementById('dc-demande');
+    demandeEl.value = d.demande || '';
+    autoGrow(demandeEl);
+    renderDemandeurDatalist();
+    refreshCardMeta(d);
+    const ia = document.getElementById('dc-ia');
+    ia.classList.toggle('hidden', !d.ia_source);
+    ia.title = d.ia_justification ? 'Justification de l’IA : ' + d.ia_justification : '';
     const sel = document.getElementById('ctx-statut');
     sel.innerHTML = STATUTS.map(s => `<option value="${escapeHtml(s)}"${s === d.statut ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
-
-    // Bloc détaillé sous la barre : affiche le texte complet de la demande initiale (la ligne
-    // du dessus, elle, reste au titre court pour rester compacte).
-    const detailBlock = document.getElementById('demande-detail-block');
-    const detailText = document.getElementById('demande-detail-text');
-    if (d.demande) {
-      detailText.textContent = d.demande;
-      detailBlock.classList.remove('hidden');
-    } else {
-      detailBlock.classList.add('hidden');
-    }
 
     // Notes internes : repliées ou dépliées selon le dernier choix (mémorisé sur ce poste).
     const notesBlock = document.getElementById('notes-internes-block');
@@ -3548,12 +3604,47 @@
     let open = false;
     try { open = localStorage.getItem(NOTES_OPEN_LS_KEY) === '1'; } catch (e) { /* stockage indisponible : replié */ }
     notesBlock.open = open;
-    notesBlock.classList.remove('hidden');
   }
   function hideDemandeContextBar() {
-    document.getElementById('demande-context').classList.add('hidden');
-    document.getElementById('demande-detail-block').classList.add('hidden');
-    document.getElementById('notes-internes-block').classList.add('hidden');
+    document.getElementById('demande-card').classList.add('hidden');
+  }
+  // Dates et lien Jira (seules parties non saisies de la carte).
+  function refreshCardMeta(d) {
+    document.getElementById('dc-date-creation').textContent = formatDateOnlyFr(d.date_creation) || '—';
+    document.getElementById('dc-date-maj').textContent = formatDateFr(d.date_maj) || '—';
+    const link = document.getElementById('dc-jira-link');
+    link.classList.toggle('hidden', !d.jira);
+    if (d.jira) link.href = jiraUrl(d.jira);
+  }
+  // La description s'agrandit avec son contenu (pas d'ascenseur dans un si petit champ).
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 2 + 'px';
+  }
+  // Champ de la carte modifié (à la sortie du champ) : enregistrement local immédiat ; la
+  // publication dans le fichier partagé suit les points habituels (badge, mail, sortie de la demande).
+  function onCardFieldChange(field, el) {
+    if (!currentDemandeId) return;
+    const d = demandes.find(x => x.id === currentDemandeId);
+    if (!d) return;
+    const value = el.value.trim();
+    if ((field === 'client' || field === 'titre') && !value) {
+      showToast(field === 'client' ? 'Le client ne peut pas être vide.' : 'Le titre ne peut pas être vide : c’est ce qui s’affiche dans le tableau.', 'error');
+      el.value = d[field] || '';
+      return;
+    }
+    if (value === (d[field] || '')) return;
+    d[field] = value;
+    d.date_maj = new Date().toISOString();
+    dirtyDemandeIds.add(d.id);
+    if (field === 'demandeur') saveDemandeurSuggestion(value);
+    commitLocal();
+    refreshCardMeta(d);
+    if (field === 'client' || field === 'titre') update(); // l'intro du mail reprend client et titre
+  }
+
+  function openReimport() {
+    showToast('Réimport : à venir (maquette).', 'info');
   }
 
   // ── Notes internes (jamais reprises dans le mail ni dans Jira) ──
@@ -3577,49 +3668,17 @@
     updateNotesInternesFlag(d);
   }
 
-  // ── Modifier une demande existante (client / titre / texte de la demande) ──
-  function openEditDemandeForm() {
-    if (!currentDemandeId) return;
-    const d = demandes.find(x => x.id === currentDemandeId);
-    if (!d) return;
-    document.getElementById('ed-client').value = d.client || '';
-    document.getElementById('ed-titre').value = d.titre || '';
-    document.getElementById('ed-jira').value = d.jira || '';
-    document.getElementById('ed-demande').value = d.demande || '';
-    document.getElementById('edit-demande-form').classList.remove('hidden');
-    document.getElementById('ed-client').focus();
-  }
-  function cancelEditDemandeForm() {
-    document.getElementById('edit-demande-form').classList.add('hidden');
-  }
-  function saveEditDemandeForm() {
-    if (!currentDemandeId) return;
-    const d = demandes.find(x => x.id === currentDemandeId);
-    if (!d) return;
-    const client = document.getElementById('ed-client').value.trim();
-    const titre = document.getElementById('ed-titre').value.trim();
-    const jira = document.getElementById('ed-jira').value.trim();
-    const demandeText = document.getElementById('ed-demande').value.trim();
-    if (!client) { showToast('Renseigne au moins le nom du client.', 'error'); return; }
-    if (!titre) { showToast('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.', 'error'); return; }
-    d.client = client;
-    d.titre = titre;
-    d.jira = jira;
-    d.demande = demandeText;
-    d.date_maj = new Date().toISOString();
-    dirtyDemandeIds.add(d.id);
-    commitLocal();
-    showDemandeContextBar(d); // rafraîchit l'affichage (client/titre) dans la barre de contexte
-    document.getElementById('edit-demande-form').classList.add('hidden');
-  }
-
   function onStatutChange() {
     if (!currentDemandeId) return;
     const d = demandes.find(x => x.id === currentDemandeId);
     if (!d) return;
     d.statut = document.getElementById('ctx-statut').value;
+    d.date_maj = new Date().toISOString();
+    dirtyDemandeIds.add(d.id);
     syncCurrentDemandeFromCalculator();
     commitLocal();
+    refreshCardMeta(d);
+    publishIfConnected();
   }
 
   // Publie aussi dans le fichier partagé, si un fichier est connecté et déjà autorisé (aucune
@@ -3633,21 +3692,34 @@
     await saveDemandes();
   }
 
-  function manualSave() {
-    if (!currentDemandeId) return;
-    syncCurrentDemandeFromCalculator();
-    commitLocal();
-    publishIfConnected();
-  }
-
-  function backToSuivi() {
+  // Quitter la demande ouverte (via le menu) : enregistre le calculateur, publie, ferme la carte.
+  function leaveCurrentDemande() {
+    clearTimeout(autoSyncTimer);
     if (currentDemandeId) syncCurrentDemandeFromCalculator();
     commitLocal();
     publishIfConnected();
     currentDemandeId = null;
     hideDemandeContextBar();
-    cancelEditDemandeForm();
+  }
+  function backToSuivi() {
+    leaveCurrentDemande();
     showView('suivi');
+  }
+
+  // Plus de bouton Enregistrer : le calculateur est enregistré en local peu après chaque saisie.
+  let autoSyncTimer = null;
+  let loadingDemande = false; // pendant l'ouverture d'une demande, les recalculs ne sont pas des saisies
+  function scheduleAutoSync() {
+    if (!currentDemandeId || loadingDemande) return;
+    clearTimeout(autoSyncTimer);
+    autoSyncTimer = setTimeout(() => {
+      if (!currentDemandeId) return;
+      syncCurrentDemandeFromCalculator();
+      persistLocal();
+      updateSyncBadge();
+      const d = demandes.find(x => x.id === currentDemandeId);
+      if (d) refreshCardMeta(d);
+    }, 800);
   }
 
   // ── Capture/restauration de l'état complet du calculateur (pour reprendre une demande plus tard) ──
@@ -3679,16 +3751,21 @@
     if (!d) return;
     const mailEl = document.getElementById('mail-render');
     const commentEl = document.getElementById('chiffrage-comment');
-    d.type = currentType || '';
-    d.etat_json = currentType ? JSON.stringify(captureFullState()) : '';
-    d.mail_html = mailEl ? mailEl.innerHTML : '';
-    // currentMailRecapText est calculé par buildMail/buildMailSplit à chaque recalcul du chiffrage
-    // (donc déjà à jour ici) ; on ne le régénère pas depuis mail_html, qui a perdu la distinction
-    // entre description générique (à ignorer) et description-liste (à garder).
-    d.mail_texte = mailEl && mailEl.innerHTML ? currentMailRecapText : '';
-    d.commentaire = commentEl ? getFieldRawValue(commentEl) : '';
-    d.total_forfait = readCurrentTotal('forfait');
-    d.total_tma = readCurrentTotal('tma');
+    const next = {
+      type: currentType || '',
+      etat_json: currentType ? JSON.stringify(captureFullState()) : '',
+      mail_html: mailEl ? mailEl.innerHTML : '',
+      // currentMailRecapText est calculé par buildMail/buildMailSplit à chaque recalcul du chiffrage
+      // (donc déjà à jour ici) ; on ne le régénère pas depuis mail_html, qui a perdu la distinction
+      // entre description générique (à ignorer) et description-liste (à garder).
+      mail_texte: mailEl && mailEl.innerHTML ? currentMailRecapText : '',
+      commentaire: commentEl ? getFieldRawValue(commentEl) : '',
+      total_forfait: readCurrentTotal('forfait'),
+      total_tma: readCurrentTotal('tma')
+    };
+    // Simple consultation (rien n'a changé) : ni date de modif, ni "à enregistrer".
+    if (Object.keys(next).every(k => (d[k] || '') === next[k])) return;
+    Object.assign(d, next);
     d.date_maj = new Date().toISOString();
     dirtyDemandeIds.add(currentDemandeId);
   }
@@ -3743,20 +3820,14 @@
   function openDemande(id) {
     const d = demandes.find(x => x.id === id);
     if (!d) return;
+    clearTimeout(autoSyncTimer);
     currentDemandeId = id;
     showView('chiffrage');
     resetCalculatorUI();
-    cancelEditDemandeForm();
     showDemandeContextBar(d);
-    loadDemandeIntoCalculatorState(d);
+    loadingDemande = true;
+    try { loadDemandeIntoCalculatorState(d); } finally { loadingDemande = false; }
     updateTypeZone();
-  }
-
-  // Depuis le tableau de suivi : ouvre directement la demande avec le formulaire de modification
-  // affiché, pour ne pas avoir à cliquer une seconde fois sur "Modifier" une fois dedans.
-  function openDemandeForEdit(id) {
-    openDemande(id);
-    openEditDemandeForm();
   }
 
   // ── Initialisation au chargement de la page ──
@@ -3806,6 +3877,7 @@
   // Garde-fou : si des changements n'ont pas encore été publiés dans le fichier partagé,
   // on prévient avant de fermer l'onglet (ils restent en local, mais l'équipe ne les voit pas encore).
   window.addEventListener('beforeunload', function (e) {
+    if (currentDemandeId) { syncCurrentDemandeFromCalculator(); persistLocal(); }
     if (fileHandle && (dirtyDemandeIds.size > 0 || deletedDemandeIds.size > 0)) {
       e.preventDefault();
       e.returnValue = '';
