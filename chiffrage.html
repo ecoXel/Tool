@@ -1031,13 +1031,13 @@
       <summary>Rappel calcul : Projet normal</summary>
       <div class="rappel-body">
         <p><strong>Gestion de projet (20%)</strong> : 1 kick-off, 30 min de coproj/semaine, 1 copil/mois</p>
-        <p><strong>Spec (30%)</strong> : X ateliers de 2h + 1 atelier de validation inclus</p>
+        <p><strong>Spec</strong> : X ateliers de 2h + 1 atelier de validation inclus → X / 2 + 0,5 j au forfait (nombre d'ateliers proposé par défaut selon le paramétrage)</p>
         <p><strong>Base de calcul</strong> : paramétrage seul (installation et développement autonomes, n'entrent pas dans le calcul des autres lignes)</p>
         <p><strong>Recette (30%)</strong> : présentation Key Users incluse ; 75% forfait / 25% TMA, avec un minimum de 1 j en forfait dès que la recette dépasse 1 j</p>
         <p><strong>MEP</strong> : 0,5j par env hors prod (0 uniquement en production)</p>
         <p><strong>Doc (10%)</strong> : DEX, DAT, passation support</p>
         <p><strong>VSR (10%)</strong> : accompagnement et correction post-livraison</p>
-        <p><strong>Petit paramétrage (≤ 3 j)</strong> : forfait plancher au lieu du calcul en % — Gestion de projet 0,5 j, Spécification 0 j, Recette et ajustement 0,5 j, Documentation 0 j (incluse dans la MEP), VSR 0 j</p>
+        <p><strong>Petit paramétrage (≤ 3 j)</strong> : forfait plancher au lieu du calcul en % — Gestion de projet 0,5 j, Spécification 0 j (sauf si le nombre d'ateliers est modifié à la main), Recette et ajustement 0,5 j, Documentation 0 j (incluse dans la MEP), VSR 0 j</p>
       </div>
     </details>
     <details id="rappel-preconf" class="hidden">
@@ -1476,7 +1476,7 @@
         <span class="tbl-unit">j</span>
       </div>
 
-      <div class="tbl-row tbl-row-split">
+      <div class="tbl-row tbl-row-split tbl-row-attached">
         <div>
           <div class="tbl-name">Spécification et ateliers</div>
           <div class="tbl-desc" id="d-spec"></div>
@@ -1484,7 +1484,13 @@
         </div>
         <input type="number" class="tbl-input-root" id="v-spec-f" value="0" min="0" step="0.5" oninput="markTouched('v-spec-f'); update();">
         <span class="tbl-unit">j</span>
-        <span class="tbl-value na" id="v-spec-t">—</span><span class="tbl-unit"></span>
+        <input type="number" class="tbl-input-root" id="v-spec-t" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+      </div>
+      <div class="tbl-row tbl-row-split tbl-row-detail">
+        <div>
+          ${richTextField('in-ateliers-detail', "Liste / contenu des ateliers prévus (repris dans le mail)")}
+        </div>
       </div>
 
       <div class="tbl-row tbl-row-split">
@@ -1514,6 +1520,19 @@
         </div>
       </div>
 
+      <div class="tbl-row tbl-row-split tbl-row-attached">
+        <div><div class="tbl-name">Connecteurs</div></div>
+        <input type="number" class="tbl-input-root" id="in-connecteurs-f" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+        <input type="number" class="tbl-input-root" id="in-connecteurs-t" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
+      </div>
+      <div class="tbl-row tbl-row-split tbl-row-detail">
+        <div>
+          ${richTextField('in-connecteurs-detail', "Précise les connecteurs concernés (ex : CRM, ERP...)")}
+        </div>
+      </div>
+
       <div class="tbl-row tbl-row-split">
         <div>
           <div class="tbl-name">Recette et ajustement</div>
@@ -1532,7 +1551,8 @@
         </div>
         <input type="number" class="tbl-input-root" id="v-mep-f" value="0" min="0" step="0.5" oninput="markTouched('v-mep-f'); update();">
         <span class="tbl-unit">j</span>
-        <span class="tbl-value na" id="v-mep-t">—</span><span class="tbl-unit"></span>
+        <input type="number" class="tbl-input-root" id="v-mep-t" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
       </div>
 
       <div class="tbl-row tbl-row-split">
@@ -1542,7 +1562,8 @@
         </div>
         <input type="number" class="tbl-input-root" id="v-doc-f" value="0" min="0" step="0.5" oninput="markTouched('v-doc-f'); update();">
         <span class="tbl-unit">j</span>
-        <span class="tbl-value na" id="v-doc-t">—</span><span class="tbl-unit"></span>
+        <input type="number" class="tbl-input-root" id="v-doc-t" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
       </div>
 
       <div class="tbl-row tbl-row-split">
@@ -1550,22 +1571,10 @@
           <div class="tbl-name">VSR</div>
           <div class="tbl-desc">accompagnement et correction post-livraison</div>
         </div>
-        <span class="tbl-value na" id="v-vsr-f">—</span><span class="tbl-unit"></span>
+        <input type="number" class="tbl-input-root" id="v-vsr-f" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
         <input type="number" class="tbl-input-root" id="v-vsr-t" value="0" min="0" step="0.5" oninput="markTouched('v-vsr-t'); update();">
         <span class="tbl-unit">j</span>
-      </div>
-
-      <div class="tbl-row tbl-row-split tbl-row-attached">
-        <div><div class="tbl-name">Connecteurs</div></div>
-        <input type="number" class="tbl-input-root" id="in-connecteurs-f" value="0" min="0" step="0.5" oninput="update()">
-        <span class="tbl-unit">j</span>
-        <input type="number" class="tbl-input-root" id="in-connecteurs-t" value="0" min="0" step="0.5" oninput="update()">
-        <span class="tbl-unit">j</span>
-      </div>
-      <div class="tbl-row tbl-row-split tbl-row-detail">
-        <div>
-          ${richTextField('in-connecteurs-detail', "Précise les connecteurs concernés (ex : CRM, ERP...)")}
-        </div>
       </div>
 
       <div class="tbl-row tbl-row-split">
@@ -1573,7 +1582,8 @@
           <div class="tbl-name">Formation</div>
           <div class="tbl-desc" id="d-formation"></div>
         </div>
-        <span class="tbl-value na" id="v-formation-f">—</span><span class="tbl-unit"></span>
+        <input type="number" class="tbl-input-root" id="v-formation-f" value="0" min="0" step="0.5" oninput="update()">
+        <span class="tbl-unit">j</span>
         <input type="number" class="tbl-input-root" id="v-formation-t" value="0" min="0" step="0.5" oninput="markTouched('v-formation-t'); update();">
         <span class="tbl-unit">j</span>
       </div>
@@ -1661,13 +1671,6 @@
 
   // valeur numérique réelle (peut être 0), affichée normalement
   function setNumValue(id, v) { setValue(id, v); }
-  // colonne non pertinente pour cette ligne (ex: TMA sur une ligne 100% forfait) -> tiret
-  function setNA(id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = '—';
-  }
-
   // case calculée mais modifiable à la main : pose la valeur calculée par défaut,
   // sauf si l'utilisateur l'a déjà modifiée (elle reste alors telle quelle).
   function setComputed(id, v) {
@@ -1764,8 +1767,9 @@
     const gestionForfait = roundUp(gestionTotal * 0.5);
     const gestionTMA = gestionTotal - gestionForfait;
 
-    // Spécification : tout en forfait, TMA = note descriptive (0,5j/atelier sup., pas une valeur chiffrée)
-    const specForfait = isSmallParam ? 0 : specDays;
+    // Spécification : nb ateliers / 2 + 0,5 en forfait. Pour un petit paramétrage, 0 par défaut,
+    // sauf si le nombre d'ateliers a été modifié à la main : on applique alors la formule.
+    const specForfait = (isSmallParam && !atelierTouched) ? 0 : specDays;
 
     // Installation / Développement / Paramétrage : forfait = saisi, TMA = saisie manuelle
     const installF = val('in-install'), installT = val('in-install-tma');
@@ -1807,33 +1811,34 @@
     const docDaysFinal = val('v-doc-f');
     const vsrDaysFinal = val('v-vsr-t');
     const formDaysFinal = val('v-formation-t');
+    // Cases sans règle de calcul (0 par défaut), saisissables si besoin
+    const specTMA = val('v-spec-t'), mepTMA = val('v-mep-t'), docTMA = val('v-doc-t');
+    const vsrForfait = val('v-vsr-f'), formForfait = val('v-formation-f');
+    const ateliersDetailEl = document.getElementById('in-ateliers-detail');
+    const ateliersDetail = ateliersDetailEl ? styleListsForMail(getFieldRawValue(ateliersDetailEl).trim()) : '';
 
     const items = [
       { label: 'Gestion de projet', desc: '<strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> toute comitologie client (coproj, copil, etc.)', forfait: gestionForfaitFinal, tma: gestionTMAFinal },
-      { label: 'Spécification et ateliers', desc: '<strong>Forfait :</strong> ' + nbAteliers + ' atelier' + (nbAteliers > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé', forfait: specForfaitFinal, tma: 0 },
+      { label: 'Spécification et ateliers', desc: '<strong>Forfait :</strong> ' + nbAteliers + ' atelier' + (nbAteliers > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé' + (ateliersDetail ? '<br><span style="font-style:italic;">' + ateliersDetail + '</span>' : ''), forfait: specForfaitFinal, tma: specTMA },
       { label: 'Installation', desc: '', forfait: installF, tma: installT },
       { label: 'Développement', desc: '', forfait: devF, tma: devT },
       { label: 'Paramétrage', desc: paramDetail() ? '<span style="font-style:italic;">' + paramDetail() + '</span>' : '', forfait: configF, tma: configT },
-      { label: 'Recette et ajustement', desc: '<strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement', forfait: recetteForfaitFinal, tma: recetteTMAFinal },
-      { label: 'Mise en production', desc: nbEnv > 0 ? nbEnv + ' environnement' + (nbEnv > 1 ? 's' : '') : '', forfait: mepDaysFinal, tma: 0 },
-      { label: 'Documentation', desc: 'DEX, DAT, passation support', forfait: docDaysFinal, tma: 0 },
-      { label: 'VSR', desc: 'accompagnement et correction post-livraison', forfait: 0, tma: vsrDaysFinal },
       { label: 'Connecteurs', desc: connDetail, forfait: connForfait, tma: connTMA },
-      { label: 'Formation', desc: nbSess > 0 ? nbSess + ' session' + (nbSess > 1 ? 's' : '') + ' (une session équivaut à 3h, max 8 participants, facturée 0,5 j par session)' : '', forfait: 0, tma: formDaysFinal },
+      { label: 'Recette et ajustement', desc: '<strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement', forfait: recetteForfaitFinal, tma: recetteTMAFinal },
+      { label: 'Mise en production', desc: nbEnv > 0 ? nbEnv + ' environnement' + (nbEnv > 1 ? 's' : '') : '', forfait: mepDaysFinal, tma: mepTMA },
+      { label: 'Documentation', desc: 'DEX, DAT, passation support', forfait: docDaysFinal, tma: docTMA },
+      { label: 'VSR', desc: 'accompagnement et correction post-livraison', forfait: vsrForfait, tma: vsrDaysFinal },
+      { label: 'Formation', desc: nbSess > 0 ? nbSess + ' session' + (nbSess > 1 ? 's' : '') + ' (une session équivaut à 3h, max 8 participants, facturée 0,5 j par session)' : '', forfait: formForfait, tma: formDaysFinal },
     ];
-
-    // Colonnes non pertinentes -> tiret dans le tableau (pas "0 j")
-    setNA('v-spec-t');
-    setNA('v-mep-t');
-    setNA('v-doc-t');
-    setNA('v-vsr-f');
-    setNA('v-formation-f');
 
     updateTotalAndMail(items, 'split');
   }
 
   function onAteliersChange() {
     atelierTouched = true;
+    // Changer le nombre d'ateliers est une intention explicite : la case forfait reprend la
+    // valeur calculée même si elle avait été saisie à la main auparavant.
+    manualTouched.delete('v-spec-f');
     updateNormal();
   }
 
@@ -1911,12 +1916,14 @@
     buildMail(items, total, totalSansOption, hasOption);
   }
 
-  // Nom du client de la demande actuellement ouverte (vide si le calculateur est utilisé seul,
-  // sans être rattaché à une demande de suivi).
-  function currentClientName() {
-    if (!currentDemandeId) return '';
-    const d = demandes.find(x => x.id === currentDemandeId);
-    return d ? (d.client || '') : '';
+  // Début de la phrase d'intro du mail : "Chiffrage pour le client X, Titre, le total est de…".
+  // Sans demande ouverte (calculateur utilisé seul), on retombe sur une formule générique.
+  function mailIntroLead() {
+    const d = currentDemandeId ? demandes.find(x => x.id === currentDemandeId) : null;
+    const parts = [];
+    if (d && d.client) parts.push('Chiffrage pour le client ' + escapeHtml(d.client));
+    if (d && d.titre) parts.push(escapeHtml(d.titre));
+    return parts.length ? parts.join(', ') + ', le total est de' : 'Concernant le chiffrage demandé, le total est de';
   }
 
   // ── Commentaire libre, repris tel quel dans le mail (les deux types) ──
@@ -1993,14 +2000,11 @@
     });
 
     const totalGrand = totalForfait + totalTMA;
-    const clientName = currentClientName();
-    const ciDessous = 'Ci-dessous le détail du chiffrage' + (clientName ? ' pour le client ' + escapeHtml(clientName) : '') + '.';
 
     const html = `
       <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
         Bonjour,<br><br>
-        Concernant le chiffrage demandé, le total est de <b>${fmt(totalGrand)}</b> (dont <b>${fmt(totalForfait)}</b> au forfait, et <b>${fmt(totalTMA)}</b> en TMA).<br>
-        ${ciDessous}
+        ${mailIntroLead()} <b>${fmt(totalGrand)}</b> (dont <b>${fmt(totalForfait)}</b> au forfait, et <b>${fmt(totalTMA)}</b> en TMA).
       </p>
       <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
         <thead>
@@ -2090,14 +2094,11 @@
           <td style="padding:8px 0;color:#1a6abf;font-weight:bold;text-align:right;border-top:2px solid #1a6abf;">${totalStr}</td>
         </tr>`;
 
-    const clientName = currentClientName();
-    const ciDessous = 'Ci-dessous le détail du chiffrage' + (clientName ? ' pour le client ' + escapeHtml(clientName) : '') + '.';
 
     const html = `
       <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
         Bonjour,<br><br>
-        Concernant le chiffrage demandé, le total est de ${introTotal}.<br>
-        ${ciDessous}
+        ${mailIntroLead()} ${introTotal}.
       </p>
       <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
         <tbody>
