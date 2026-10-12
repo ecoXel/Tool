@@ -199,6 +199,31 @@
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
   .ia-flag { margin-left: 4px; font-size: 11px; cursor: help; }
+  .nd-type-choice { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-mid); }
+  .nd-type-choice label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
+  .type-zone-hint { font-size: 12px; color: var(--status-waiting); margin-bottom: 8px; }
+  .param-section { background: var(--surface); border: 1px solid var(--border); padding: 16px; margin-bottom: 16px; }
+  .param-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mid); margin-bottom: 8px; }
+  .param-help { font-size: 12px; color: var(--text-dim); line-height: 1.6; margin-bottom: 12px; }
+  .param-help code { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-mid); }
+  .param-section .file-status-bar { margin-bottom: 0; }
+  .toast-zone { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; max-width: 380px; }
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 10px 14px;
+    white-space: pre-line;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    transition: opacity 0.4s;
+  }
+  .toast-warn { border-left-color: var(--status-waiting); }
+  .toast-error { border-left-color: #f87171; }
+  .toast-out { opacity: 0; }
   .demandes-table tbody tr.row-kept { opacity: 0.45; }
   .tbl-input-root.is-forced { border-color: var(--status-waiting); color: var(--status-waiting); }
   .tbl-row-split .tbl-unit .reset-calc { visibility: visible; } /* l'unité "j" est masquée en mode Projet, pas le ↺ */
@@ -848,6 +873,8 @@
 </head>
 <body>
 
+<div id="toast-zone" class="toast-zone"></div>
+
 <div class="container">
 
   <div class="top-bar">
@@ -856,27 +883,15 @@
       <span class="sync-badge" id="sync-badge" onclick="syncBadgeClick()" title=""></span>
     </div>
     <div class="top-bar-actions">
-      <button class="btn-nav" id="nav-suivi" onclick="showView('suivi')">📋 Suivi des demandes</button>
-      <button class="btn-nav" id="nav-commandes" onclick="showView('commandes')">📦 Suivi des commandes</button>
-      <button class="btn-reset" onclick="resetAll(); showView('chiffrage');">🧮 Chiffrage</button>
+      <button class="btn-nav" id="nav-suivi" onclick="showView('suivi')">📋 Demandes</button>
+      <button class="btn-nav" id="nav-commandes" onclick="showView('commandes')">📦 Commandes</button>
+      <button class="btn-nav" id="nav-preconf" onclick="openBlankCalculator('preconf')" title="Calculateur vierge, sans demande ni enregistrement">🧮 Préconf</button>
+      <button class="btn-nav" id="nav-normal" onclick="openBlankCalculator('normal')" title="Calculateur vierge, sans demande ni enregistrement">🧮 Projet</button>
+      <button class="btn-nav" id="nav-param" onclick="showView('param')">⚙️ Paramétrage</button>
     </div>
   </div>
 
   <div id="view-suivi" class="hidden">
-    <div class="file-status-bar">
-      <span id="file-status-text">—</span>
-      <div class="file-status-actions">
-        <button class="btn-action" id="btn-connect-file" onclick="connectFile()">Choisir le dossier partagé…</button>
-        <button class="btn-action hidden" id="btn-import-ia" onclick="importInbox()"></button>
-        <button class="btn-action hidden" id="btn-reconnect-file" onclick="reconnectFile()">🔓 Reconnecter</button>
-        <button class="btn-action hidden" id="btn-reload-file" onclick="loadFromFileHandle()">📂 Charger depuis le fichier</button>
-        <button class="btn-action hidden" id="btn-save-file" onclick="saveDemandes()">💾 Enregistrer dans le fichier</button>
-        <button class="btn-action hidden" id="btn-import-fallback" onclick="document.getElementById('csv-import-input').click()">Importer CSV…</button>
-        <button class="btn-action hidden" id="btn-export-fallback" onclick="downloadCsv()">⬇ Télécharger CSV</button>
-        <input type="file" id="csv-import-input" accept=".csv" class="hidden" onchange="handleCsvImport(event)">
-      </div>
-    </div>
-
     <div class="suivi-toolbar">
       <input type="text" id="filter-search" class="search-input" placeholder="🔎 Rechercher (client, titre, demande)…" oninput="onSearchInput()">
       <select id="filter-client" onchange="onClientFilterChange()"></select>
@@ -886,6 +901,8 @@
         <div class="statut-filter-menu hidden" id="statut-filter-menu"></div>
       </div>
       <span class="toolbar-spacer"></span>
+      <button class="btn-action hidden" id="btn-import-ia" onclick="importInbox()"></button>
+      <button class="btn-icon hidden" id="btn-reload-quick" onclick="loadFromFileHandle()" title="Recharger depuis le fichier partagé (modifications des collègues)">⟳</button>
       <button class="btn-icon" onclick="openAiImportForm()" title="Importer un pré-chiffrage Copilot (JSON)">🤖</button>
       <button class="btn-icon btn-icon-primary" onclick="openNewDemandeForm()" title="Nouvelle demande">+</button>
     </div>
@@ -908,6 +925,11 @@
       <datalist id="demandeur-suggestions"></datalist>
       <input type="text" id="nd-jira" placeholder="Ticket Jira (ex : INTE-4715)">
       <textarea id="nd-demande" rows="2" placeholder="Demande initiale du client"></textarea>
+      <div class="nd-type-choice">
+        <span>Type de chiffrage (définitif) :</span>
+        <label><input type="radio" name="nd-type" value="preconf"> Préconf</label>
+        <label><input type="radio" name="nd-type" value="normal"> Projet</label>
+      </div>
       <div class="new-demande-form-actions">
         <button class="btn-primary" onclick="createDemande()">Créer et chiffrer</button>
         <button class="btn-action" onclick="cancelNewDemandeForm()">Annuler</button>
@@ -973,7 +995,27 @@
     </div>
   </div>
 
-  <div id="view-chiffrage">
+  <div id="view-param" class="hidden">
+    <div class="param-section">
+      <div class="param-title">Fichier partagé</div>
+      <p class="param-help">Choisis le dossier OneDrive qui contient le CSV des chiffrages. Le même dossier sert à l’historique pour l’IA (<code>historique-ia.csv</code>, réécrit à chaque enregistrement) et aux chiffrages en attente d’import (<code>chiffrages-en-attente/</code>, créé automatiquement).</p>
+    <div class="file-status-bar">
+        <span id="file-status-text">—</span>
+        <div class="file-status-actions">
+          <button class="btn-action" id="btn-connect-file" onclick="connectFile()">Choisir le dossier partagé…</button>
+          <button class="btn-action hidden" id="btn-reconnect-file" onclick="reconnectFile()">🔓 Reconnecter</button>
+          <button class="btn-action hidden" id="btn-reload-file" onclick="loadFromFileHandle()">📂 Charger depuis le fichier</button>
+          <button class="btn-action hidden" id="btn-save-file" onclick="saveDemandes()">💾 Enregistrer dans le fichier</button>
+          <button class="btn-action hidden" id="btn-import-fallback" onclick="document.getElementById('csv-import-input').click()">Importer CSV…</button>
+          <button class="btn-action hidden" id="btn-export-fallback" onclick="downloadCsv()">⬇ Télécharger CSV</button>
+          <input type="file" id="csv-import-input" accept=".csv" class="hidden" onchange="handleCsvImport(event)">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="view-chiffrage" class="hidden">
 
   <div id="demande-context" class="demande-context hidden">
     <div class="demande-context-info">
@@ -1012,9 +1054,12 @@
     </div>
   </div>
 
-  <div class="type-bar">
-    <button class="type-btn" data-type="preconf" onclick="setType('preconf', this)">Préconf</button>
-    <button class="type-btn" data-type="normal" onclick="setType('normal', this)">Projet</button>
+  <div id="type-zone" class="hidden">
+    <div class="type-zone-hint">Choisis le type de chiffrage de cette demande — il ne pourra plus être changé.</div>
+    <div class="type-bar">
+      <button class="type-btn" data-type="preconf" onclick="setType('preconf', this)">Préconf</button>
+      <button class="type-btn" data-type="normal" onclick="setType('normal', this)">Projet</button>
+    </div>
   </div>
 
   <div class="main-panel">
@@ -1176,7 +1221,7 @@
   // pour cliquer sur "Enregistrer" à part — sauf s'il n'y a justement aucun fichier connecté, où
   // il n'y a rien à enregistrer tant qu'on n'en a pas choisi un (ça, ça reste au Suivi).
   async function syncBadgeClick() {
-    if (!fileHandle && fileApiSupported) { showView('suivi'); return; }
+    if (!fileHandle && fileApiSupported) { showView('param'); return; }
     if (currentDemandeId) { syncCurrentDemandeFromCalculator(); commitLocal(); }
     await saveDemandes();
   }
@@ -1432,6 +1477,28 @@
     applyTypeChrome(type);
     renderTypeBody(type);
     update();
+    // Demande pas encore typée : le choix est définitif, on l'enregistre tout de suite.
+    if (currentDemandeId) {
+      syncCurrentDemandeFromCalculator();
+      commitLocal();
+      updateTypeZone();
+    }
+  }
+
+  // Le choix du type n'apparaît que pour une demande qui n'en a pas encore (anciennes demandes) ;
+  // les calculateurs vierges ont leur type fixé par le menu.
+  function updateTypeZone() {
+    const d = currentDemandeId ? demandes.find(x => x.id === currentDemandeId) : null;
+    document.getElementById('type-zone').classList.toggle('hidden', !(d && !d.type && !currentType));
+  }
+
+  // Menu Préconf / Projet : calculateur vierge, sans demande rattachée ni enregistrement.
+  function openBlankCalculator(type) {
+    if (currentDemandeId) { syncCurrentDemandeFromCalculator(); commitLocal(); publishIfConnected(); }
+    resetAll();
+    showView('chiffrage', type);
+    setType(type);
+    updateTypeZone();
   }
 
   // ── Bascule le gate paramétrage vers le tableau complet ────
@@ -2200,6 +2267,12 @@
   function copyMail() {
     const mailEl = document.getElementById('mail-render');
     if (!mailEl.innerHTML || mailEl.innerHTML.trim() === '') return;
+    // Garde-fou : le titre "Points à vérifier" posé par l'import IA est une note pour le commerce,
+    // pas pour le client. On cherche ce titre précis (sans casse ni accents).
+    const commentEl = document.getElementById('chiffrage-comment');
+    const commentTxt = commentEl ? normalizeSearch(htmlToPlainText(getFieldRawValue(commentEl))) : '';
+    if (commentTxt.includes('points a verifier')
+      && !confirm('Le commentaire contient encore « Points à vérifier » : il sera dans le mail.\nCopier quand même ?')) return;
 
     // Copier le mail est, comme afficher l'aperçu, un point de passage naturel pour enregistrer.
     syncCurrentDemandeFromCalculator();
@@ -2461,6 +2534,7 @@
     if (!fileApiSupported) return; // le mode fallback gère ses propres boutons
     const connected = !!fileHandle;
     document.getElementById('btn-reload-file').classList.toggle('hidden', !connected);
+    document.getElementById('btn-reload-quick').classList.toggle('hidden', !connected);
     document.getElementById('btn-save-file').classList.toggle('hidden', !connected);
   }
 
@@ -2552,6 +2626,7 @@
     } catch (e) {
       console.error(e);
       setFileStatus('Impossible de lire le fichier : ' + e.message);
+      showToast('Impossible de lire le fichier partagé : ' + e.message, 'error');
     }
   }
 
@@ -2584,6 +2659,7 @@
       } catch (e) {
         console.error(e);
         setFileStatus('Échec de l’enregistrement : ' + e.message + ' (tes changements restent en local, réessaie).');
+        showToast('Échec de l’enregistrement dans le fichier partagé (' + e.message + '). Tes changements restent en local.', 'error');
       }
     } else if (!fileApiSupported) {
       setFileStatus('Non sauvegardé sur disque — pense à cliquer "Télécharger CSV" pour publier tes changements.');
@@ -2632,14 +2708,31 @@
     setFileStatus('CSV téléchargé — dépose-le dans le dossier partagé pour que l’équipe le voie.');
   }
 
+  // ── Notifications non bloquantes (remplacent les alert() du navigateur) ──
+  function showToast(msg, kind) {
+    const zone = document.getElementById('toast-zone');
+    if (!zone) return;
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + (kind || 'info');
+    t.textContent = msg;
+    t.title = 'Cliquer pour fermer';
+    t.onclick = () => t.remove();
+    zone.appendChild(t);
+    setTimeout(() => { t.classList.add('toast-out'); setTimeout(() => t.remove(), 400); }, kind === 'error' || kind === 'warn' ? 8000 : 4000);
+  }
+
   // ── Navigation entre vues ──
-  function showView(view) {
-    document.getElementById('view-chiffrage').classList.toggle('hidden', view !== 'chiffrage');
+  // nav : entrée de menu à surligner ; par défaut, une demande ouverte dans le calculateur
+  // reste rattachée à "Demandes" (les calculateurs vierges passent 'preconf' / 'normal').
+  function showView(view, nav) {
+    ['chiffrage', 'suivi', 'commandes', 'param'].forEach(v => {
+      document.getElementById('view-' + v).classList.toggle('hidden', view !== v);
+    });
     if (view === 'suivi') keepVisibleIds.clear();
-    document.getElementById('view-suivi').classList.toggle('hidden', view !== 'suivi');
-    document.getElementById('view-commandes').classList.toggle('hidden', view !== 'commandes');
-    document.getElementById('nav-suivi').classList.toggle('active', view === 'suivi');
-    document.getElementById('nav-commandes').classList.toggle('active', view === 'commandes');
+    const activeNav = nav || (view === 'chiffrage' ? 'suivi' : view);
+    ['suivi', 'commandes', 'preconf', 'normal', 'param'].forEach(n => {
+      document.getElementById('nav-' + n).classList.toggle('active', activeNav === n);
+    });
     if (view === 'suivi') renderDemandesTable();
     if (view === 'commandes') renderCommandesView();
   }
@@ -3036,6 +3129,7 @@
     document.getElementById('nd-demande').value = '';
     document.getElementById('nd-demandeur').value = '';
     document.getElementById('nd-jira').value = '';
+    document.querySelectorAll('input[name="nd-type"]').forEach(r => { r.checked = false; });
     renderDemandeurDatalist();
     document.getElementById('nd-client').focus();
   }
@@ -3049,8 +3143,10 @@
     const demandeText = document.getElementById('nd-demande').value.trim();
     const demandeur = document.getElementById('nd-demandeur').value.trim();
     const jira = document.getElementById('nd-jira').value.trim();
-    if (!client) { alert('Renseigne au moins le nom du client.'); return; }
-    if (!titre) { alert('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.'); return; }
+    const typeInput = document.querySelector('input[name="nd-type"]:checked');
+    if (!client) { showToast('Renseigne au moins le nom du client.', 'error'); return; }
+    if (!titre) { showToast('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.', 'error'); return; }
+    if (!typeInput) { showToast('Choisis le type de chiffrage (Préconf ou Projet).', 'error'); return; }
     const now = new Date().toISOString();
     const d = {
       id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
@@ -3067,6 +3163,7 @@
     cancelNewDemandeForm();
     commitLocal();
     openDemande(d.id);
+    setType(typeInput.value); // type fixé dès la création (et enregistré par setType)
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -3153,12 +3250,12 @@
   // sur le suivi, où elles apparaissent avec le repère 🤖.
   function finishAiImport(created, invalidCount) {
     if (!created.length) {
-      alert('Aucune demande exploitable trouvée' + (invalidCount ? ' (' + invalidCount + ' fichier(s) illisible(s))' : '') + ' : vérifie que c’est bien le JSON donné par Copilot.');
+      showToast('Aucune demande exploitable trouvée' + (invalidCount ? ' (' + invalidCount + ' fichier(s) illisible(s))' : '') + ' : vérifie que c’est bien le JSON donné par Copilot.', 'error');
       return;
     }
     closeAiImportForm();
     if (created.length === 1 && !invalidCount) { openDemande(created[0].id); return; }
-    alert(created.length + ' demande' + (created.length > 1 ? 's importées' : ' importée') + ' (repère 🤖, à relire)'
+    showToast(created.length + ' demande' + (created.length > 1 ? 's importées' : ' importée') + ' (repère 🤖, à relire)'
       + (invalidCount ? '\n' + invalidCount + ' fichier(s) illisible(s) ignoré(s)' : ''));
   }
 
@@ -3337,7 +3434,7 @@
     const parts = [];
     if (imported.length) parts.push(imported.length + ' chiffrage' + (imported.length > 1 ? 's importés' : ' importé') + ' (repérés 🤖, à relire)');
     if (invalid.length) parts.push(invalid.length + ' fichier' + (invalid.length > 1 ? 's illisibles rangés' : ' illisible rangé') + ' dans « ' + INBOX_DIR + '/erreurs » : ' + invalid.join(', '));
-    if (parts.length) alert(parts.join('\n'));
+    if (parts.length) showToast(parts.join('\n'), invalid.length ? 'warn' : 'info');
   }
 
   // Version allégée du CSV, réécrite à chaque enregistrement, pour servir de base à l'agent :
@@ -3495,8 +3592,8 @@
     const titre = document.getElementById('ed-titre').value.trim();
     const jira = document.getElementById('ed-jira').value.trim();
     const demandeText = document.getElementById('ed-demande').value.trim();
-    if (!client) { alert('Renseigne au moins le nom du client.'); return; }
-    if (!titre) { alert('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.'); return; }
+    if (!client) { showToast('Renseigne au moins le nom du client.', 'error'); return; }
+    if (!titre) { showToast('Renseigne un titre : c’est ce qui s’affichera dans le tableau de suivi.', 'error'); return; }
     d.client = client;
     d.titre = titre;
     d.jira = jira;
@@ -3644,6 +3741,7 @@
     cancelEditDemandeForm();
     showDemandeContextBar(d);
     loadDemandeIntoCalculatorState(d);
+    updateTypeZone();
   }
 
   // Depuis le tableau de suivi : ouvre directement la demande avec le formulaire de modification
@@ -3658,7 +3756,7 @@
   // le fichier CSV partagé, lui, n'est lu/écrit que sur action explicite ("Charger"/"Enregistrer").
   (function initLocal() {
     demandes = loadLocal();
-    renderDemandesTable();
+    showView('suivi');
   })();
 
   (async function initFileConnection() {
@@ -3668,14 +3766,16 @@
       dirHandle = dir;
       csvFileName = (await idbLoad('csvName')) || DEFAULT_CSV_NAME;
       if ((await dir.queryPermission({ mode: 'readwrite' })) === 'granted') {
+        // Accès déjà accordé : on récupère tout de suite les modifications des collègues
+        // (fusion sûre, nos changements locaux non publiés l'emportent).
         if (await attachCsvFromDir()) {
           updateFileButtons();
-          setFileStatus('Dossier "' + dir.name + '" connecté (' + csvFileName + ') — clique "Charger" ou "Enregistrer" pour synchroniser.');
-          await refreshInboxCount();
+          await loadFromFileHandle();
         }
       } else {
         setFileStatus('Dossier "' + dir.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
         document.getElementById('btn-reconnect-file').classList.remove('hidden');
+        showToast('Fichier partagé à reconnecter : ⚙️ Paramétrage → Reconnecter.', 'warn');
       }
       return;
     }
