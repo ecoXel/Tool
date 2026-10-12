@@ -97,7 +97,9 @@ Ce que l'outil en fait :
   Hébergement et environnements sont aussi ajoutés à la fin du résumé de la demande.
   Sans hébergement, l'outil reprend `installation_j` s'il est fourni (sinon 0).
 - `detail_ateliers` → liste reprise dans le mail ; **nombre d'ateliers = nombre de lignes**.
-- `justification` + `points_a_verifier` → affichés au survol du repère 🤖.
+- `justification` → affichée au survol du repère 🤖.
+- `points_a_verifier` → mis dans le **commentaire** en bas du calculateur (⚠️ ce commentaire est repris
+  dans le mail : à reformuler ou retirer avant envoi).
 - `type` : en `"preconf"`, les jours sont ignorés (forfait fixe).
 - Jours : par pas de 0,5 ; `"2,5"` est accepté aussi. Champ optionnel : `jira`.
 - Gestion de projet, spécification, recette, MEP, documentation, VSR, totaux et mail : calculés

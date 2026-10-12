@@ -3170,8 +3170,12 @@
     const contexte = [];
     if (hebergementRaw) contexte.push('Hébergement : ' + hebergementRaw);
     if (envHorsProd !== null) contexte.push(envHorsProd + ' environnement' + (envHorsProd > 1 ? 's' : '') + ' hors prod');
-    const justification = [str(r.justification), str(r.points_a_verifier) ? 'À vérifier : ' + str(r.points_a_verifier) : '']
-      .filter(Boolean).join('\n');
+    // Points à vérifier → commentaire du chiffrage (zone en bas du calculateur). Copilot peut
+    // renvoyer une liste ou un texte ; une liste devient des puces.
+    const points = Array.isArray(r.points_a_verifier)
+      ? r.points_a_verifier.map(x => '- ' + str(x)).join('\n')
+      : str(r.points_a_verifier);
+    const commentaire = points ? '<b>Points à vérifier :</b><br>' + aiTextToRichHtml(points) : '';
     const now = new Date().toISOString();
     return {
       id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
@@ -3184,9 +3188,9 @@
       date_creation: now, date_maj: now,
       type, total_forfait: '', total_tma: '',
       etat_json: JSON.stringify({ currentType: type, atelierTouched: atelierTouchedState, paramRevealed: paramRevealedState, manualTouched: [], fields }),
-      mail_html: '', mail_texte: '', commentaire: '',
+      mail_html: '', mail_texte: '', commentaire,
       numero_commande: '', temps_passe_forfait: '', temps_passe_tma: '',
-      ia_source: sourceName, ia_justification: justification
+      ia_source: sourceName, ia_justification: str(r.justification)
     };
   }
 
