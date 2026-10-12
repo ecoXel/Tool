@@ -261,6 +261,20 @@
   .demande-card .notes-internes-block textarea.card-input:hover { border-color: var(--border); }
   .demande-card .notes-internes-block textarea.card-input:focus { border-color: var(--accent); background: var(--bg); }
   @media (max-width: 700px) { .card-meta { grid-template-columns: repeat(2, 1fr); } .card-client { width: 100%; } }
+  .reimport-panel { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed var(--accent-dim); background: var(--bg); }
+  .reimport-panel textarea {
+    width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 8px 10px; outline: none; resize: vertical;
+  }
+  .reimport-panel textarea:focus { border-color: var(--accent); }
+  .reimport-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text); }
+  .reimport-row label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .reimport-preview { font-size: 12px; color: var(--text-mid); }
+  .reimport-preview ul { margin: 0 0 6px; padding-left: 18px; }
+  .reimport-preview li { margin: 2px 0; }
+  .reimport-warn { color: var(--status-waiting); font-size: 12px; margin: 2px 0; }
+  .reimport-hint { color: var(--text-dim); font-size: 11px; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
   .nd-type-choice { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-mid); }
   .nd-type-choice label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
   .type-zone-hint { font-size: 12px; color: var(--status-waiting); margin-bottom: 8px; }
@@ -1097,6 +1111,22 @@
       <button class="btn-action" onclick="openReimport()" title="Mettre à jour cette demande avec un nouveau JSON Copilot">🤖 Réimporter</button>
       <button class="btn-action" onclick="duplicateDemande(currentDemandeId)" title="Créer une nouvelle demande à partir de ce chiffrage">📑 Dupliquer</button>
     </div>
+    <div id="reimport-panel" class="reimport-panel hidden">
+      <div class="card-label">🤖 Réimporter un JSON Copilot dans cette demande</div>
+      <textarea id="reimport-text" rows="4" placeholder="Colle ici le nouveau JSON de Copilot" oninput="previewReimport()"></textarea>
+      <div class="reimport-row">
+        <button class="btn-action" onclick="document.getElementById('reimport-file').click()">Ou importer un fichier .json…</button>
+        <input type="file" id="reimport-file" accept=".json,.txt,application/json" class="hidden" onchange="onReimportFile(event)">
+      </div>
+      <div id="reimport-preview" class="reimport-preview"></div>
+      <div class="reimport-row">
+        <label><input type="radio" name="reimport-mode" value="ecraser" checked> Écraser</label>
+        <label><input type="radio" name="reimport-mode" value="version"> Nouvelle version <span class="reimport-hint">(la version actuelle est gardée au statut « Archivé »)</span></label>
+        <span class="card-spacer"></span>
+        <button class="btn-action" onclick="closeReimport()">Annuler</button>
+        <button class="btn-primary" id="btn-apply-reimport" onclick="applyReimport()" disabled>Réimporter</button>
+      </div>
+    </div>
     <div class="card-meta">
       <div class="card-field">
         <div class="card-label">Demandeur</div>
@@ -1242,7 +1272,7 @@
   let manualTouched = new Set(); // ids des cases calculées que l'utilisateur a modifiées à la main
 
   // ── Suivi des demandes de chiffrage ──────────────────────
-  const STATUTS = ['Demande', 'Attente', 'En cours', 'Dev', 'Transmis', 'Révision', 'Validé', 'Refus', 'Abandonné'];
+  const STATUTS = ['Demande', 'Attente', 'En cours', 'Dev', 'Transmis', 'Révision', 'Validé', 'Refus', 'Abandonné', 'Archivé'];
   // Regroupement par couleur : bleu (nouveau/à revoir), violet (en cours de traitement),
   // orange (en attente d'un retour), vert (validé), rouge (refusé), gris (abandonné).
   const STATUT_BADGE_CLASS = {
@@ -1255,6 +1285,7 @@
     'Validé': 's-done',
     'Refus': 's-closed',
     'Abandonné': 's-abandoned',
+    'Archivé': 's-abandoned',
   };
   function statutBadge(statut) {
     if (!statut) return '';
@@ -2836,7 +2867,7 @@
   // ── Filtres du suivi : client/demandeur (menus déroulants) + statuts (cases à cocher).
   // Par défaut les statuts "clos" (Validé/Refus/Abandonné) sont masqués pour ne pas noyer
   // la liste des demandes encore actives.
-  const STATUTS_MASQUES_PAR_DEFAUT = ['Transmis', 'Validé', 'Refus', 'Abandonné'];
+  const STATUTS_MASQUES_PAR_DEFAUT = ['Transmis', 'Validé', 'Refus', 'Abandonné', 'Archivé'];
   let filterClient = '';
   let filterDemandeur = '';
   let filterStatuts = new Set(STATUTS.filter(s => !STATUTS_MASQUES_PAR_DEFAUT.includes(s)));
@@ -3650,8 +3681,141 @@
     if (field === 'client' || field === 'titre') update(); // l'intro du mail reprend client et titre
   }
 
+  // ── Réimport d'un JSON Copilot dans la demande ouverte ──
+  // Remplacé : jours, hébergement/environnements, textes de détail, liste des ateliers,
+  // description. Ajouté : justification (notes internes), points à vérifier (commentaire).
+  // Jamais touché : client, titre, demandeur, statut, Jira, dates, type, lignes forcées à la main.
+  const REIMPORT_DAYS = [['in-config', 'Paramétrage'], ['in-install', 'Installation'], ['in-dev', 'Développement'], ['in-connecteurs-f', 'Connecteurs']];
+  const REIMPORT_TEXTS = [['in-detail', 'Détail paramétrage'], ['in-connecteurs-detail', 'Détail connecteurs'], ['in-ateliers-detail', 'Liste des ateliers']];
+  let reimportPending = null; // { r, source, plan } prêt à appliquer
+
   function openReimport() {
-    showToast('Réimport : à venir (maquette).', 'info');
+    document.getElementById('reimport-text').value = '';
+    document.getElementById('reimport-preview').innerHTML = '';
+    document.getElementById('btn-apply-reimport').disabled = true;
+    document.querySelector('input[name="reimport-mode"][value="ecraser"]').checked = true;
+    reimportPending = null;
+    document.getElementById('reimport-panel').classList.remove('hidden');
+    document.getElementById('reimport-text').focus();
+  }
+  function closeReimport() {
+    reimportPending = null;
+    document.getElementById('reimport-panel').classList.add('hidden');
+  }
+  async function onReimportFile(evt) {
+    const f = evt.target.files && evt.target.files[0];
+    evt.target.value = '';
+    if (!f) return;
+    document.getElementById('reimport-text').value = await f.text();
+    previewReimport(f.name);
+  }
+
+  function stateFields(d) {
+    try { const st = JSON.parse(d.etat_json || '{}'); return { st, fields: st.fields || {} }; } catch (e) { return { st: {}, fields: {} }; }
+  }
+
+  // Calcule ce que le réimport changerait, et l'affiche (flèches avant → après).
+  function previewReimport(sourceName) {
+    const box = document.getElementById('reimport-preview');
+    const btn = document.getElementById('btn-apply-reimport');
+    reimportPending = null;
+    btn.disabled = true;
+    const d = currentDemandeId ? demandes.find(x => x.id === currentDemandeId) : null;
+    const txt = document.getElementById('reimport-text').value;
+    if (!d || !txt.trim()) { box.innerHTML = ''; return; }
+    const list = parseAiJsonList(txt);
+    const nd = list.length ? demandeFromAiResult(list[0], sourceName || 'reimport') : null;
+    if (!nd) { box.innerHTML = '<div class="reimport-warn">Pas de JSON Copilot exploitable dans ce texte.</div>'; return; }
+
+    if (currentDemandeId) syncCurrentDemandeFromCalculator(); // comparer avec l'état réellement à l'écran
+    const oldF = stateFields(d).fields;
+    const newF = stateFields(nd).fields;
+    const lines = [];
+    const notes = [];
+    if (list.length > 1) notes.push('Plusieurs demandes dans le texte : seule la première est utilisée.');
+    const isProjet = d.type === 'normal';
+    if (nd.type !== d.type) notes.push('Type « ' + (nd.type === 'preconf' ? 'Préconf' : 'Projet') + ' » du JSON ignoré : la demande reste en ' + (isProjet ? 'Projet' : 'Préconf') + '.');
+    const plan = {};
+    if (isProjet) {
+      REIMPORT_DAYS.forEach(([id, label]) => {
+        const a = parseTotalNum(oldF[id]), b = parseTotalNum(newF[id]);
+        plan[id] = String(b);
+        if (a !== b) lines.push(`<li><b>${label}</b> : ${fmtNum(a)} j → <b>${fmtNum(b)} j</b></li>`);
+      });
+      if (newF['in-env'] !== undefined) {
+        const a = oldF['in-env'] !== undefined ? parseInt(oldF['in-env'], 10) : 1, b = parseInt(newF['in-env'], 10);
+        plan['in-env'] = String(b);
+        if (a !== b) lines.push(`<li><b>Environnements hors prod</b> : ${a} → <b>${b}</b></li>`);
+      }
+      if (newF['in-ateliers'] !== undefined) {
+        const a = oldF['in-ateliers'] !== undefined ? parseInt(oldF['in-ateliers'], 10) : null, b = parseInt(newF['in-ateliers'], 10);
+        plan['in-ateliers'] = String(b);
+        if (a !== b) lines.push(`<li><b>Ateliers</b> : ${a === null ? 'par défaut' : a} → <b>${b}</b></li>`);
+      }
+      REIMPORT_TEXTS.forEach(([id, label]) => {
+        const a = htmlToPlainText(oldF[id] || '').trim(), b = htmlToPlainText(newF[id] || '').trim();
+        plan[id] = newF[id] || '';
+        if (a !== b) lines.push(`<li><b>${label}</b> : ${b ? (a ? 'modifié' : 'ajouté') : 'vidé'}</li>`);
+      });
+    }
+    if (nd.demande && nd.demande !== (d.demande || '')) lines.push('<li><b>Description du besoin</b> : remplacée</li>');
+    if (nd.commentaire) lines.push('<li><b>Points à vérifier</b> : ajoutés au commentaire</li>');
+    if (nd.ia_justification) lines.push('<li><b>Justification</b> : ajoutée aux notes internes</li>');
+
+    box.innerHTML = (lines.length ? '<ul>' + lines.join('') + '</ul>' : '<div class="reimport-warn">Aucun changement par rapport à la demande actuelle.</div>')
+      + notes.map(n => `<div class="reimport-warn">${escapeHtml(n)}</div>`).join('')
+      + '<div class="reimport-hint">Inchangés : client, titre, demandeur, statut, Jira, lignes modifiées à la main.</div>';
+    if (lines.length) {
+      reimportPending = { nd, plan, source: sourceName || ('reimport-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)) };
+      btn.disabled = false;
+    }
+  }
+
+  function applyReimport() {
+    const d = currentDemandeId ? demandes.find(x => x.id === currentDemandeId) : null;
+    if (!d || !reimportPending) return;
+    const { nd, plan, source } = reimportPending;
+    const mode = document.querySelector('input[name="reimport-mode"]:checked').value;
+    syncCurrentDemandeFromCalculator();
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    if (mode === 'version') {
+      // Photo de la version actuelle, au statut Archivé ; la demande d'origine (Jira, suivi de
+      // commande…) reste la ligne "vivante" et reçoit le nouveau chiffrage.
+      const archive = Object.assign({}, d, {
+        id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        titre: (d.titre || '') + ' (version du ' + now.toLocaleDateString('fr-FR') + ')',
+        statut: 'Archivé',
+        date_maj: nowIso
+      });
+      demandes.push(archive);
+      dirtyDemandeIds.add(archive.id);
+    }
+
+    const { st, fields } = stateFields(d);
+    Object.assign(fields, plan);
+    const newState = Object.assign({ currentType: d.type, manualTouched: [] }, st, { fields });
+    if (plan['in-ateliers'] !== undefined) newState.atelierTouched = true;
+    if (d.type === 'normal' && parseTotalNum(plan['in-config']) + parseTotalNum(plan['in-install']) + parseTotalNum(plan['in-dev']) > 0) newState.paramRevealed = true;
+    d.etat_json = JSON.stringify(newState);
+    if (nd.demande) d.demande = nd.demande;
+    if (nd.commentaire) d.commentaire = (d.commentaire ? d.commentaire + '<br>' : '') + nd.commentaire;
+    if (nd.ia_justification) {
+      const header = 'Réimport du ' + now.toLocaleDateString('fr-FR') + ' — Justification de l’IA : ' + nd.ia_justification;
+      d.notes_internes = (d.notes_internes ? d.notes_internes.trimEnd() + '\n\n' : '') + header;
+      d.ia_justification = nd.ia_justification;
+    }
+    d.ia_source = d.ia_source || source;
+    d.date_maj = nowIso;
+    dirtyDemandeIds.add(d.id);
+
+    closeReimport();
+    openDemande(d.id);                 // recalcule avec les nouvelles entrées
+    syncCurrentDemandeFromCalculator(); // totaux et mail à jour
+    commitLocal();
+    publishIfConnected();
+    showToast(mode === 'version' ? 'Réimport fait — l’ancienne version est gardée au statut « Archivé ».' : 'Réimport fait.', 'info');
   }
 
   // ── Notes internes (jamais reprises dans le mail ni dans Jira) ──
