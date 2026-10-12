@@ -198,17 +198,7 @@
   .new-demande-form input[type="text"]:focus,
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
-  .ai-import {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1px dashed var(--border);
-    margin-bottom: 4px;
-  }
-  .ai-import-head { font-size: 12px; font-weight: 600; color: var(--text); }
-  .ai-import-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .ai-import-hint { font-size: 11px; font-weight: 400; color: var(--text-dim); }
+  .ia-flag { margin-left: 4px; font-size: 11px; cursor: help; }
 
   .demandes-table {
     width: 100%;
@@ -842,7 +832,8 @@
     <div class="file-status-bar">
       <span id="file-status-text">—</span>
       <div class="file-status-actions">
-        <button class="btn-action" id="btn-connect-file" onclick="connectFile()">Choisir le fichier CSV…</button>
+        <button class="btn-action" id="btn-connect-file" onclick="connectFile()">Choisir le dossier partagé…</button>
+        <button class="btn-action hidden" id="btn-import-ia" onclick="importInbox()"></button>
         <button class="btn-action hidden" id="btn-reconnect-file" onclick="reconnectFile()">🔓 Reconnecter</button>
         <button class="btn-action hidden" id="btn-reload-file" onclick="loadFromFileHandle()">📂 Charger depuis le fichier</button>
         <button class="btn-action hidden" id="btn-save-file" onclick="saveDemandes()">💾 Enregistrer dans le fichier</button>
@@ -865,17 +856,6 @@
     </div>
 
     <div id="new-demande-form" class="new-demande-form hidden">
-      <div class="ai-import">
-        <div class="ai-import-head">🤖 Pré-remplir avec Copilot <span class="ai-import-hint">(facultatif)</span></div>
-        <div class="ai-import-row">
-          <button class="btn-action" id="btn-copy-copilot" onclick="copyCopilotPrompt()">1. Copier le prompt</button>
-          <span class="ai-import-hint">puis colle-le dans Copilot, avec le mail du commercial ou les documents</span>
-        </div>
-        <textarea id="nd-ai-response" rows="3" placeholder="2. Colle ici la réponse de Copilot (le bloc JSON)"></textarea>
-        <div class="ai-import-row">
-          <button class="btn-action" onclick="importFromCopilot()">3. Créer la demande pré-remplie</button>
-        </div>
-      </div>
       <input type="text" id="nd-client" placeholder="Client">
       <input type="text" id="nd-titre" placeholder="Titre (ce qui s'affichera dans le tableau)">
       <input type="text" id="nd-demandeur" list="demandeur-suggestions" placeholder="Demandeur (commercial, contact interne...)">
@@ -1152,7 +1132,12 @@
   let demandes = []; // liste travaillée en local (localStorage) : { id, client, demande, statut, date_creation, date_maj, type, total_forfait, total_tma, etat_json, mail_html }
   let currentDemandeId = null; // demande actuellement ouverte dans le calculateur, ou null en mode "chiffrage libre"
   let fileHandle = null; // FileSystemFileHandle du CSV connecté (navigateurs compatibles uniquement)
-  const fileApiSupported = typeof window.showOpenFilePicker === 'function';
+  // Dossier partagé contenant le CSV : donne aussi accès à la boîte d'arrivée IA et à l'historique IA.
+  // (Ancien mode "fichier seul" toujours accepté au démarrage, mais sans ces deux fonctions.)
+  let dirHandle = null;
+  let csvFileName = '';
+  const DEFAULT_CSV_NAME = 'demandes_chiffrage.csv';
+  const fileApiSupported = typeof window.showDirectoryPicker === 'function';
 
   // Sélectionne tout le contenu d'une case numérique quand on clique/tab dedans,
   // pour que taper "10" remplace le "0" existant au lieu de s'ajouter à côté (-> "010"/"100").
@@ -2206,7 +2191,7 @@
   // ── Suivi des demandes de chiffrage (liste + persistance CSV) ──
   // ═══════════════════════════════════════════════════════════
 
-  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'mail_texte', 'commentaire', 'commentaire_texte', 'numero_commande', 'temps_passe_forfait', 'temps_passe_tma'];
+  const CSV_COLUMNS = ['id', 'client', 'titre', 'demande', 'demandeur', 'jira', 'statut', 'date_creation', 'date_maj', 'type', 'total_forfait', 'total_tma', 'etat_json', 'mail_html', 'mail_texte', 'commentaire', 'commentaire_texte', 'numero_commande', 'temps_passe_forfait', 'temps_passe_tma', 'ia_source', 'ia_justification'];
 
   // ── Conversion HTML → texte brut lisible, pour les colonnes CSV destinées à être ouvertes
   // dans Excel (le mail et le commentaire sont stockés en HTML pour l'app, illisibles tels quels
@@ -2360,22 +2345,22 @@
       req.onerror = () => reject(req.error);
     });
   }
-  async function idbSaveHandle(handle) {
+  async function idbSave(key, value) {
     try {
       const db = await idbOpen();
       await new Promise((resolve, reject) => {
         const tx = db.transaction(IDB_STORE, 'readwrite');
-        tx.objectStore(IDB_STORE).put(handle, 'csv');
+        tx.objectStore(IDB_STORE).put(value, key);
         tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
       });
-    } catch (e) { console.error('idbSaveHandle', e); }
+    } catch (e) { console.error('idbSave', e); }
   }
-  async function idbLoadHandle() {
+  async function idbLoad(key) {
     try {
       const db = await idbOpen();
       return await new Promise((resolve, reject) => {
         const tx = db.transaction(IDB_STORE, 'readonly');
-        const req = tx.objectStore(IDB_STORE).get('csv');
+        const req = tx.objectStore(IDB_STORE).get(key);
         req.onsuccess = () => resolve(req.result || null);
         req.onerror = () => reject(req.error);
       });
@@ -2402,24 +2387,62 @@
     document.getElementById('btn-save-file').classList.toggle('hidden', !connected);
   }
 
+  // On choisit le DOSSIER (et plus seulement le fichier) : c'est ce qui permet de lire la
+  // boîte d'arrivée IA et d'écrire l'historique IA à côté du CSV.
   async function connectFile() {
     try {
-      const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }],
-        excludeAcceptAllOption: false,
-        multiple: false
-      });
-      fileHandle = handle;
-      await idbSaveHandle(handle);
+      const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+      const csvNames = [];
+      for await (const [name, h] of dir.entries()) {
+        if (h.kind === 'file' && /\.csv$/i.test(name) && name !== HISTORY_FILE) csvNames.push(name);
+      }
+      let name;
+      if (csvNames.length === 1) {
+        name = csvNames[0];
+      } else if (csvNames.length > 1) {
+        const answer = prompt('Plusieurs fichiers CSV dans ce dossier. Lequel contient les chiffrages ? (numéro)\n' + csvNames.map((n, i) => (i + 1) + '. ' + n).join('\n'), '1');
+        const idx = parseInt(answer, 10) - 1;
+        if (!(idx >= 0 && idx < csvNames.length)) return;
+        name = csvNames[idx];
+      } else {
+        if (!confirm('Aucun fichier CSV dans ce dossier. Créer « ' + DEFAULT_CSV_NAME + ' » ?')) return;
+        name = DEFAULT_CSV_NAME;
+      }
+      dirHandle = dir;
+      csvFileName = name;
+      fileHandle = await dir.getFileHandle(name, { create: true });
+      await idbSave('dir', dir);
+      await idbSave('csvName', name);
       document.getElementById('btn-reconnect-file').classList.add('hidden');
       updateFileButtons();
       await loadFromFileHandle();
     } catch (e) {
-      if (e.name !== 'AbortError') { console.error(e); setFileStatus('Erreur à l’ouverture du fichier : ' + e.message); }
+      if (e.name !== 'AbortError') { console.error(e); setFileStatus('Erreur à l’ouverture du dossier : ' + e.message); }
+    }
+  }
+
+  // Dossier mémorisé et autorisé : récupère le CSV dedans (sans le recréer s'il a disparu).
+  async function attachCsvFromDir() {
+    try {
+      fileHandle = await dirHandle.getFileHandle(csvFileName);
+      return true;
+    } catch (e) {
+      fileHandle = null;
+      setFileStatus('« ' + csvFileName + ' » introuvable dans le dossier « ' + dirHandle.name + ' » — clique "Choisir le dossier partagé…".');
+      return false;
     }
   }
 
   async function reconnectFile() {
+    if (dirHandle) {
+      if (await verifyPermission(dirHandle, true)) {
+        document.getElementById('btn-reconnect-file').classList.add('hidden');
+        if (await attachCsvFromDir()) { updateFileButtons(); await loadFromFileHandle(); }
+      } else {
+        setFileStatus('Permission refusée pour le dossier "' + dirHandle.name + '".');
+      }
+      return;
+    }
     if (!fileHandle) return;
     const perm = await verifyPermission(fileHandle, true);
     if (perm) {
@@ -2448,6 +2471,7 @@
       persistLocal();
       setFileStatus('Chargé depuis ' + fileHandle.name + ' — ' + demandes.length + ' demande(s).');
       renderDemandesTable();
+      await refreshInboxCount();
     } catch (e) {
       console.error(e);
       setFileStatus('Impossible de lire le fichier : ' + e.message);
@@ -2477,6 +2501,9 @@
         deletedDemandeIds.clear();
         persistLocal();
         setFileStatus('Enregistré dans ' + fileHandle.name + ' — ' + new Date().toLocaleTimeString('fr-FR'));
+        await writeHistoryFile(merged);
+        renderDemandesTable();
+        return true;
       } catch (e) {
         console.error(e);
         setFileStatus('Échec de l’enregistrement : ' + e.message + ' (tes changements restent en local, réessaie).');
@@ -2484,9 +2511,10 @@
     } else if (!fileApiSupported) {
       setFileStatus('Non sauvegardé sur disque — pense à cliquer "Télécharger CSV" pour publier tes changements.');
     } else {
-      setFileStatus('Aucun fichier connecté — clique "Choisir le fichier CSV…" pour commencer à sauvegarder.');
+      setFileStatus('Aucun dossier connecté — clique "Choisir le dossier partagé…" pour commencer à sauvegarder.');
     }
     renderDemandesTable();
+    return false;
   }
 
   // ── Fallback navigateurs sans File System Access API (Firefox, Safari) ──
@@ -2720,10 +2748,13 @@
       const commentTxt = commentPlain.trim()
         ? `<span class="comment-flag" title="${escapeHtml(commentPlain.trim())}">💬</span>`
         : '';
+      const iaFlag = d.ia_source
+        ? `<span class="ia-flag" title="${escapeHtml('Pré-rempli par l’IA' + (d.ia_justification ? ' — ' + d.ia_justification : ''))}">🤖</span>`
+        : '';
       return `
         <tr ondblclick="if (!event.target.closest('.demande-actions') && !event.target.closest('.jira-cell') && !event.target.closest('.statut-cell')) openDemande('${d.id}')">
           <td>${escapeHtml(d.client || '')}</td>
-          <td class="demande-cell"><span title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</span>${commentTxt}</td>
+          <td class="demande-cell"><span title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</span>${iaFlag}${commentTxt}</td>
           <td class="statut-cell" onclick="editStatutInline(this, '${d.id}')" title="Cliquer pour changer le statut">${statutBadge(d.statut)}</td>
           <td>${formatDateFr(d.date_maj)}</td>
           <td>${forfaitTxt}</td>
@@ -2914,7 +2945,6 @@
     document.getElementById('nd-demande').value = '';
     document.getElementById('nd-demandeur').value = '';
     document.getElementById('nd-jira').value = '';
-    document.getElementById('nd-ai-response').value = '';
     renderDemandeurDatalist();
     document.getElementById('nd-client').focus();
   }
@@ -2949,78 +2979,18 @@
   }
 
   // ═══════════════════════════════════════════════════════════
-  // ── Pré-remplissage via Copilot (ou toute autre IA) ──
-  // Pas d'appel direct : l'outil est un fichier local sans serveur ni clé API. On fait donc
-  // un aller-retour par copier-coller : (1) l'outil génère un prompt avec les consignes, le
-  // format de réponse attendu et un extrait de l'historique ; (2) on le colle dans Copilot avec
-  // le mail / les documents ; (3) on recolle ici le JSON renvoyé. L'IA ne remplit que les
-  // entrées (textes + jours saisis) : tout le reste est calculé par les règles habituelles.
+  // ── Chiffrages pré-remplis par l'IA (agent Copilot) ──
+  // L'agent ne touche jamais au CSV : il dépose un petit fichier JSON par demande dans le
+  // sous-dossier INBOX_DIR, à côté du CSV. L'outil les lit, crée les lignes (en calculant
+  // etat_json, totaux et mail avec les règles habituelles), publie le CSV, puis supprime les
+  // JSON traités. L'IA ne fournit que les entrées : textes + jours saisis.
+  // Format attendu et consignes de l'agent : voir copilot-agent.md.
   // ═══════════════════════════════════════════════════════════
-  const COPILOT_HISTORY_MAX = 40;      // nombre de chiffrages d'exemple joints au prompt
-  const COPILOT_DEMANDE_MAX_CHARS = 200;
+  const INBOX_DIR = 'chiffrages-en-attente';
+  const HISTORY_FILE = 'historique-ia.csv';
 
-  function historyLineForPrompt(d) {
-    let f = {};
-    try { f = (JSON.parse(d.etat_json || '{}').fields) || {}; } catch (e) { f = {}; }
-    const n = (id) => (f[id] !== undefined && f[id] !== '' ? String(f[id]) : '0');
-    const typeTxt = d.type === 'preconf' ? 'Préconf' : 'Projet';
-    const jours = d.type === 'normal'
-      ? `param ${n('in-config')} / install ${n('in-install')} / dev ${n('in-dev')} / connecteurs ${n('in-connecteurs-f')}`
-      : 'forfait fixe';
-    const demandeTxt = truncateText(htmlToPlainText(d.demande || '').replace(/\s+/g, ' ').trim(), COPILOT_DEMANDE_MAX_CHARS);
-    return `- ${d.client || '?'} | ${d.titre || '?'} | ${typeTxt} | ${jours} | total forfait ${d.total_forfait || '—'}, TMA ${d.total_tma || '—'} | ${d.statut || ''} | ${demandeTxt}`;
-  }
-
-  function buildCopilotPrompt() {
-    const history = demandes
-      .filter(d => d.type && d.etat_json)
-      .sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''))
-      .slice(0, COPILOT_HISTORY_MAX)
-      .map(historyLineForPrompt);
-    return [
-      "Tu m'aides à préparer un chiffrage DocuWare à partir d'une demande commerciale (mail et/ou documents joints).",
-      '',
-      'Réponds UNIQUEMENT avec un bloc JSON, sans texte autour, au format suivant :',
-      '{',
-      '  "client": "nom du client final",',
-      '  "titre": "titre court de la demande (moins de 60 caractères)",',
-      '  "demandeur": "nom du commercial ou contact qui fait la demande",',
-      '  "demande": "résumé clair de la demande initiale du client, en quelques phrases",',
-      '  "type": "projet" ou "preconf",',
-      '  "parametrage_j": nombre de jours de paramétrage,',
-      '  "installation_j": nombre de jours d\'installation,',
-      '  "developpement_j": nombre de jours de développement,',
-      '  "connecteurs_j": nombre de jours pour les connecteurs,',
-      '  "detail_parametrage": "contenu du paramétrage, une ligne par élément commençant par - ",',
-      '  "detail_connecteurs": "connecteurs concernés, une ligne par élément commençant par - ",',
-      '  "detail_ateliers": "liste des ateliers à prévoir, une ligne par élément commençant par - ",',
-      '  "justification": "en une ou deux phrases : sur quels chiffrages ci-dessous tu t\'appuies et pourquoi"',
-      '}',
-      '',
-      'Règles :',
-      '- Les jours sont par pas de 0,5. Mets 0 quand un poste ne s\'applique pas.',
-      '- "preconf" = installation préconfigurée standard à forfait fixe (les jours sont alors ignorés) ; sinon "projet".',
-      '- N\'invente pas : si une information est absente de la demande, laisse le champ texte vide ("").',
-      '- Base-toi sur les chiffrages passés ci-dessous pour estimer les jours (privilégie les Validé).',
-      '',
-      'Chiffrages passés (client | titre | type | jours saisis | totaux | statut | demande) :',
-      history.length ? history.join('\n') : '(aucun historique disponible)',
-      '',
-      'Voici la demande à analyser :',
-      ''
-    ].join('\n');
-  }
-
-  function copyCopilotPrompt() {
-    const btn = document.getElementById('btn-copy-copilot');
-    navigator.clipboard.writeText(buildCopilotPrompt()).then(() => {
-      btn.textContent = 'Prompt copié !';
-      setTimeout(() => { btn.textContent = '1. Copier le prompt'; }, 2000);
-    }).catch(() => alert('Copie impossible dans le presse-papiers (navigateur).'));
-  }
-
-  // Extrait le premier objet JSON de la réponse (Copilot l'entoure souvent de ```json … ``` ou d'une phrase).
-  function parseCopilotResponse(text) {
+  // Extrait le premier objet JSON du texte (tolère un ```json … ``` ou une phrase autour).
+  function parseAiJson(text) {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
     if (start < 0 || end <= start) return null;
@@ -3051,15 +3021,11 @@
     return html;
   }
 
-  function importFromCopilot() {
-    const raw = document.getElementById('nd-ai-response').value;
-    const r = parseCopilotResponse(raw);
-    if (!r) { alert('Je ne trouve pas de JSON valide dans la réponse collée.'); return; }
+  // Construit une demande complète à partir du JSON de l'IA (null si rien d'exploitable).
+  function demandeFromAiResult(r, sourceName) {
     const str = (v) => (v === undefined || v === null ? '' : String(v).trim());
-    const client = str(r.client) || document.getElementById('nd-client').value.trim();
-    const titre = str(r.titre) || document.getElementById('nd-titre').value.trim();
-    if (!client || !titre) { alert('La réponse ne contient pas de client ou de titre : complète-les dans le formulaire puis recommence.'); return; }
-
+    const demandeText = str(r.demande);
+    if (!str(r.client) && !str(r.titre) && !demandeText) return null;
     const type = str(r.type).toLowerCase().startsWith('pre') ? 'preconf' : 'normal';
     const fields = {};
     let paramRevealedState = true;
@@ -3074,32 +3040,132 @@
       // Même logique que le gate : sans aucun jour saisi, on reste sur l'écran de paramétrage.
       paramRevealedState = aiDays(r.parametrage_j) + aiDays(r.installation_j) + aiDays(r.developpement_j) > 0;
     }
-
     const now = new Date().toISOString();
-    const d = {
+    return {
       id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-      client, titre,
-      demande: str(r.demande) || document.getElementById('nd-demande').value.trim(),
-      demandeur: str(r.demandeur) || document.getElementById('nd-demandeur').value.trim(),
-      jira: document.getElementById('nd-jira').value.trim(),
+      client: str(r.client) || '(client à préciser)',
+      titre: str(r.titre) || truncateText(demandeText, 60),
+      demande: demandeText,
+      demandeur: str(r.demandeur),
+      jira: str(r.jira),
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
       type, total_forfait: '', total_tma: '',
       etat_json: JSON.stringify({ currentType: type, atelierTouched: false, paramRevealed: paramRevealedState, manualTouched: [], fields }),
-      mail_html: '', mail_texte: '',
-      numero_commande: '', temps_passe_forfait: '', temps_passe_tma: ''
+      mail_html: '', mail_texte: '', commentaire: '',
+      numero_commande: '', temps_passe_forfait: '', temps_passe_tma: '',
+      ia_source: sourceName, ia_justification: str(r.justification)
     };
-    demandes.push(d);
-    dirtyDemandeIds.add(d.id);
-    saveDemandeurSuggestion(d.demandeur);
-    cancelNewDemandeForm();
+  }
+
+  async function listInboxFiles() {
+    const inbox = await dirHandle.getDirectoryHandle(INBOX_DIR, { create: true });
+    const files = [];
+    for await (const [name, h] of inbox.entries()) {
+      if (h.kind === 'file' && /\.json$/i.test(name)) files.push(h);
+    }
+    return { inbox, files };
+  }
+
+  // Met à jour le bouton "🤖 N chiffrage(s) en attente d'import" (caché s'il n'y en a aucun).
+  async function refreshInboxCount() {
+    const btn = document.getElementById('btn-import-ia');
+    let n = 0;
+    if (dirHandle && fileHandle) {
+      try { n = (await listInboxFiles()).files.length; } catch (e) { console.error('boîte d’arrivée IA', e); }
+    }
+    btn.textContent = '🤖 ' + n + ' chiffrage' + (n > 1 ? 's' : '') + ' en attente d’import — Importer';
+    btn.classList.toggle('hidden', n === 0);
+    return n;
+  }
+
+  // Fichier inexploitable : rangé dans INBOX_DIR/erreurs pour ne pas être recompté à chaque fois
+  // (copie puis suppression : l'API "déplacer" n'est pas disponible partout).
+  async function moveToErrors(inbox, h) {
+    try {
+      const errDir = await inbox.getDirectoryHandle('erreurs', { create: true });
+      const content = await (await h.getFile()).text();
+      const w = await (await errDir.getFileHandle(h.name, { create: true })).createWritable();
+      await w.write(content);
+      await w.close();
+      await inbox.removeEntry(h.name);
+    } catch (e) { console.error('déplacement vers erreurs/ de ' + h.name, e); }
+  }
+
+  async function importInbox() {
+    if (!dirHandle || !fileHandle) return;
+    if (!(await verifyPermission(dirHandle, true))) { setFileStatus('Permission refusée sur le dossier.'); return; }
+    // Une demande peut être ouverte dans le calculateur : on garde ses changements avant de
+    // réutiliser le calculateur pour calculer les demandes importées.
+    if (currentDemandeId) syncCurrentDemandeFromCalculator();
+
+    const { inbox, files } = await listInboxFiles();
+    const known = new Set(demandes.map(d => d.ia_source).filter(Boolean));
+    const imported = [], alreadyKnown = [], invalid = [];
+    for (const h of files) {
+      if (known.has(h.name)) { alreadyKnown.push(h.name); continue; } // déjà importé (ex : suppression ratée la dernière fois)
+      let r = null;
+      try { r = parseAiJson(await (await h.getFile()).text()); } catch (e) { r = null; }
+      const d = r ? demandeFromAiResult(r, h.name) : null;
+      if (!d) { invalid.push(h.name); await moveToErrors(inbox, h); continue; }
+      demandes.push(d);
+      dirtyDemandeIds.add(d.id);
+      saveDemandeurSuggestion(d.demandeur);
+      imported.push(d);
+    }
+
+    // Passage dans le calculateur pour obtenir totaux et mail, comme une saisie à la main.
+    imported.forEach(d => { openDemande(d.id); syncCurrentDemandeFromCalculator(); });
+    currentDemandeId = null;
+    hideDemandeContextBar();
+    showView('suivi');
     commitLocal();
-    openDemande(d.id);
-    // Le calculateur vient de tout recalculer : on enregistre les totaux et le mail obtenus.
-    syncCurrentDemandeFromCalculator();
-    commitLocal();
-    const justif = str(r.justification);
-    if (justif) alert('Pré-remplissage fait. À relire !\n\nCopilot s’est appuyé sur : ' + justif);
+
+    // Publication immédiate dans le CSV ; les JSON ne sont supprimés que si elle a réussi
+    // (sinon ils restent là et seront reconnus comme déjà importés la prochaine fois).
+    if (imported.length || alreadyKnown.length) {
+      const saved = await saveDemandes();
+      if (saved) {
+        for (const name of imported.map(d => d.ia_source).concat(alreadyKnown)) {
+          try { await inbox.removeEntry(name); } catch (e) { console.error('suppression ' + name, e); }
+        }
+      }
+    }
+    await refreshInboxCount();
+
+    const parts = [];
+    if (imported.length) parts.push(imported.length + ' chiffrage' + (imported.length > 1 ? 's importés' : ' importé') + ' (repérés 🤖, à relire)');
+    if (invalid.length) parts.push(invalid.length + ' fichier' + (invalid.length > 1 ? 's illisibles rangés' : ' illisible rangé') + ' dans « ' + INBOX_DIR + '/erreurs » : ' + invalid.join(', '));
+    if (parts.length) alert(parts.join('\n'));
+  }
+
+  // Version allégée du CSV, réécrite à chaque enregistrement, pour servir de base à l'agent :
+  // uniquement des colonnes lisibles (pas de JSON du calculateur ni de HTML de mail).
+  const HISTORY_COLUMNS = ['client', 'titre', 'demandeur', 'type', 'statut', 'date_demande', 'parametrage_j', 'installation_j', 'developpement_j', 'connecteurs_j', 'total_forfait', 'total_tma', 'demande', 'detail_parametrage', 'detail_connecteurs', 'detail_ateliers'];
+  async function writeHistoryFile(rows) {
+    if (!dirHandle) return;
+    try {
+      const lines = [HISTORY_COLUMNS.join(',')];
+      rows.filter(d => d.type).forEach(d => {
+        let f = {};
+        try { f = (JSON.parse(d.etat_json || '{}').fields) || {}; } catch (e) { f = {}; }
+        const n = (id) => (d.type === 'normal' ? (f[id] || '0') : '');
+        const txt = (id) => htmlToPlainText(f[id] || '');
+        lines.push([
+          d.client, d.titre, d.demandeur, d.type === 'preconf' ? 'Préconf' : 'Projet', d.statut,
+          (d.date_creation || '').slice(0, 10),
+          n('in-config'), n('in-install'), n('in-dev'), n('in-connecteurs-f'),
+          d.total_forfait, d.total_tma,
+          htmlToPlainText(d.demande || ''), txt('in-detail'), txt('in-connecteurs-detail'), txt('in-ateliers-detail')
+        ].map(csvField).join(','));
+      });
+      const fh = await dirHandle.getFileHandle(HISTORY_FILE, { create: true });
+      const w = await fh.createWritable();
+      await w.write('﻿' + lines.join('\r\n') + '\r\n');
+      await w.close();
+    } catch (e) {
+      console.error('historique IA', e); // pas bloquant : le CSV principal, lui, est bien enregistré
+    }
   }
 
   function deleteDemande(id) {
@@ -3129,7 +3195,8 @@
       jira: '',
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
-      numero_commande: '', temps_passe_forfait: '', temps_passe_tma: ''
+      numero_commande: '', temps_passe_forfait: '', temps_passe_tma: '',
+      ia_source: '', ia_justification: ''
     });
     demandes.push(d);
     dirtyDemandeIds.add(d.id);
@@ -3149,7 +3216,10 @@
     const metaParts = [];
     if (d.demandeur) metaParts.push('Demandeur : ' + d.demandeur);
     if (d.date_creation) metaParts.push('créée le ' + formatDateOnlyFr(d.date_creation));
-    document.getElementById('ctx-meta').textContent = metaParts.join(' · ');
+    if (d.ia_source) metaParts.push('🤖 pré-rempli par l’IA');
+    const ctxMeta = document.getElementById('ctx-meta');
+    ctxMeta.textContent = metaParts.join(' · ');
+    ctxMeta.title = d.ia_justification ? 'Justification de l’IA : ' + d.ia_justification : '';
     document.getElementById('ctx-jira').innerHTML = d.jira ? jiraLink(d.jira) : '';
     const sel = document.getElementById('ctx-statut');
     sel.innerHTML = STATUTS.map(s => `<option value="${escapeHtml(s)}"${s === d.statut ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
@@ -3352,16 +3422,32 @@
 
   (async function initFileConnection() {
     if (!fileApiSupported) { setupFallbackUI(); return; }
-    const handle = await idbLoadHandle();
+    const dir = await idbLoad('dir');
+    if (dir) {
+      dirHandle = dir;
+      csvFileName = (await idbLoad('csvName')) || DEFAULT_CSV_NAME;
+      if ((await dir.queryPermission({ mode: 'readwrite' })) === 'granted') {
+        if (await attachCsvFromDir()) {
+          updateFileButtons();
+          setFileStatus('Dossier "' + dir.name + '" connecté (' + csvFileName + ') — clique "Charger" ou "Enregistrer" pour synchroniser.');
+          await refreshInboxCount();
+        }
+      } else {
+        setFileStatus('Dossier "' + dir.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
+        document.getElementById('btn-reconnect-file').classList.remove('hidden');
+      }
+      return;
+    }
+    const handle = await idbLoad('csv'); // ancien mode : fichier seul, sans boîte d'arrivée IA
     if (!handle) {
-      setFileStatus('Travail local (' + demandes.length + ' demande(s)) — clique "Choisir le fichier CSV…" pour connecter le fichier partagé.');
+      setFileStatus('Travail local (' + demandes.length + ' demande(s)) — clique "Choisir le dossier partagé…" (celui qui contient le CSV).');
       return;
     }
     fileHandle = handle;
     updateFileButtons();
     const already = (await handle.queryPermission({ mode: 'readwrite' })) === 'granted';
     if (already) {
-      setFileStatus('Fichier "' + handle.name + '" connecté — clique "Charger" ou "Enregistrer" pour synchroniser.');
+      setFileStatus('Fichier "' + handle.name + '" connecté — pour activer l’import IA, clique "Choisir le dossier partagé…" (le dossier qui contient ce fichier).');
     } else {
       setFileStatus('Fichier "' + handle.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
       document.getElementById('btn-reconnect-file').classList.remove('hidden');
