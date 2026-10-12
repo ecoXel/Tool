@@ -2004,7 +2004,7 @@
     const html = `
       <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
         Bonjour,<br><br>
-        ${mailIntroLead()} <b>${fmt(totalGrand)}</b> (dont <b>${fmt(totalForfait)}</b> au forfait, et <b>${fmt(totalTMA)}</b> en TMA).
+        ${mailIntroLead()} <b>${fmtJour(totalGrand)}</b> (dont <b>${fmtJour(totalForfait)}</b> au forfait, et <b>${fmtJour(totalTMA)}</b> en TMA).
       </p>
       <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
         <thead>
@@ -2049,9 +2049,10 @@
     const totalStr = fmt(total);
     const totalSansStr = fmt(totalSansOption);
 
+    // Dans la phrase d'intro on écrit "jours" en toutes lettres ; le tableau garde "j".
     let introTotal = hasOption && totalSansOption !== total
-      ? `<b>${totalSansStr}</b> hors formation, et <b>${totalStr}</b> avec la formation`
-      : `<b>${totalStr}</b>`;
+      ? `<b>${fmtJour(totalSansOption)}</b> hors formation, et <b>${fmtJour(total)}</b> avec la formation`
+      : `<b>${fmtJour(total)}</b>`;
 
     let rows = '';
     items.forEach(it => {
