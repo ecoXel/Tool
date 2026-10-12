@@ -198,6 +198,17 @@
   .new-demande-form input[type="text"]:focus,
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
+  .ai-import {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px dashed var(--border);
+    margin-bottom: 4px;
+  }
+  .ai-import-head { font-size: 12px; font-weight: 600; color: var(--text); }
+  .ai-import-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ai-import-hint { font-size: 11px; font-weight: 400; color: var(--text-dim); }
 
   .demandes-table {
     width: 100%;
@@ -854,6 +865,17 @@
     </div>
 
     <div id="new-demande-form" class="new-demande-form hidden">
+      <div class="ai-import">
+        <div class="ai-import-head">🤖 Pré-remplir avec Copilot <span class="ai-import-hint">(facultatif)</span></div>
+        <div class="ai-import-row">
+          <button class="btn-action" id="btn-copy-copilot" onclick="copyCopilotPrompt()">1. Copier le prompt</button>
+          <span class="ai-import-hint">puis colle-le dans Copilot, avec le mail du commercial ou les documents</span>
+        </div>
+        <textarea id="nd-ai-response" rows="3" placeholder="2. Colle ici la réponse de Copilot (le bloc JSON)"></textarea>
+        <div class="ai-import-row">
+          <button class="btn-action" onclick="importFromCopilot()">3. Créer la demande pré-remplie</button>
+        </div>
+      </div>
       <input type="text" id="nd-client" placeholder="Client">
       <input type="text" id="nd-titre" placeholder="Titre (ce qui s'affichera dans le tableau)">
       <input type="text" id="nd-demandeur" list="demandeur-suggestions" placeholder="Demandeur (commercial, contact interne...)">
@@ -2892,6 +2914,7 @@
     document.getElementById('nd-demande').value = '';
     document.getElementById('nd-demandeur').value = '';
     document.getElementById('nd-jira').value = '';
+    document.getElementById('nd-ai-response').value = '';
     renderDemandeurDatalist();
     document.getElementById('nd-client').focus();
   }
@@ -2923,6 +2946,160 @@
     cancelNewDemandeForm();
     commitLocal();
     openDemande(d.id);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ── Pré-remplissage via Copilot (ou toute autre IA) ──
+  // Pas d'appel direct : l'outil est un fichier local sans serveur ni clé API. On fait donc
+  // un aller-retour par copier-coller : (1) l'outil génère un prompt avec les consignes, le
+  // format de réponse attendu et un extrait de l'historique ; (2) on le colle dans Copilot avec
+  // le mail / les documents ; (3) on recolle ici le JSON renvoyé. L'IA ne remplit que les
+  // entrées (textes + jours saisis) : tout le reste est calculé par les règles habituelles.
+  // ═══════════════════════════════════════════════════════════
+  const COPILOT_HISTORY_MAX = 40;      // nombre de chiffrages d'exemple joints au prompt
+  const COPILOT_DEMANDE_MAX_CHARS = 200;
+
+  function historyLineForPrompt(d) {
+    let f = {};
+    try { f = (JSON.parse(d.etat_json || '{}').fields) || {}; } catch (e) { f = {}; }
+    const n = (id) => (f[id] !== undefined && f[id] !== '' ? String(f[id]) : '0');
+    const typeTxt = d.type === 'preconf' ? 'Préconf' : 'Projet';
+    const jours = d.type === 'normal'
+      ? `param ${n('in-config')} / install ${n('in-install')} / dev ${n('in-dev')} / connecteurs ${n('in-connecteurs-f')}`
+      : 'forfait fixe';
+    const demandeTxt = truncateText(htmlToPlainText(d.demande || '').replace(/\s+/g, ' ').trim(), COPILOT_DEMANDE_MAX_CHARS);
+    return `- ${d.client || '?'} | ${d.titre || '?'} | ${typeTxt} | ${jours} | total forfait ${d.total_forfait || '—'}, TMA ${d.total_tma || '—'} | ${d.statut || ''} | ${demandeTxt}`;
+  }
+
+  function buildCopilotPrompt() {
+    const history = demandes
+      .filter(d => d.type && d.etat_json)
+      .sort((a, b) => (b.date_maj || '').localeCompare(a.date_maj || ''))
+      .slice(0, COPILOT_HISTORY_MAX)
+      .map(historyLineForPrompt);
+    return [
+      "Tu m'aides à préparer un chiffrage DocuWare à partir d'une demande commerciale (mail et/ou documents joints).",
+      '',
+      'Réponds UNIQUEMENT avec un bloc JSON, sans texte autour, au format suivant :',
+      '{',
+      '  "client": "nom du client final",',
+      '  "titre": "titre court de la demande (moins de 60 caractères)",',
+      '  "demandeur": "nom du commercial ou contact qui fait la demande",',
+      '  "demande": "résumé clair de la demande initiale du client, en quelques phrases",',
+      '  "type": "projet" ou "preconf",',
+      '  "parametrage_j": nombre de jours de paramétrage,',
+      '  "installation_j": nombre de jours d\'installation,',
+      '  "developpement_j": nombre de jours de développement,',
+      '  "connecteurs_j": nombre de jours pour les connecteurs,',
+      '  "detail_parametrage": "contenu du paramétrage, une ligne par élément commençant par - ",',
+      '  "detail_connecteurs": "connecteurs concernés, une ligne par élément commençant par - ",',
+      '  "detail_ateliers": "liste des ateliers à prévoir, une ligne par élément commençant par - ",',
+      '  "justification": "en une ou deux phrases : sur quels chiffrages ci-dessous tu t\'appuies et pourquoi"',
+      '}',
+      '',
+      'Règles :',
+      '- Les jours sont par pas de 0,5. Mets 0 quand un poste ne s\'applique pas.',
+      '- "preconf" = installation préconfigurée standard à forfait fixe (les jours sont alors ignorés) ; sinon "projet".',
+      '- N\'invente pas : si une information est absente de la demande, laisse le champ texte vide ("").',
+      '- Base-toi sur les chiffrages passés ci-dessous pour estimer les jours (privilégie les Validé).',
+      '',
+      'Chiffrages passés (client | titre | type | jours saisis | totaux | statut | demande) :',
+      history.length ? history.join('\n') : '(aucun historique disponible)',
+      '',
+      'Voici la demande à analyser :',
+      ''
+    ].join('\n');
+  }
+
+  function copyCopilotPrompt() {
+    const btn = document.getElementById('btn-copy-copilot');
+    navigator.clipboard.writeText(buildCopilotPrompt()).then(() => {
+      btn.textContent = 'Prompt copié !';
+      setTimeout(() => { btn.textContent = '1. Copier le prompt'; }, 2000);
+    }).catch(() => alert('Copie impossible dans le presse-papiers (navigateur).'));
+  }
+
+  // Extrait le premier objet JSON de la réponse (Copilot l'entoure souvent de ```json … ``` ou d'une phrase).
+  function parseCopilotResponse(text) {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    try { return JSON.parse(text.slice(start, end + 1)); } catch (e) { return null; }
+  }
+
+  // "2,5", "2.5 j", 2.5 → 2.5 arrondi au 0,5 supérieur ; tout le reste → 0.
+  function aiDays(v) {
+    const n = parseFloat(String(v === undefined || v === null ? '' : v).replace(',', '.'));
+    return isFinite(n) && n > 0 ? roundUp(n) : 0;
+  }
+
+  // Texte brut de l'IA → HTML des zones de texte enrichi : lignes "- …" / "• …" en liste à puces.
+  function aiTextToRichHtml(v) {
+    const lines = String(v || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let html = '', inList = false;
+    lines.forEach(l => {
+      const m = l.match(/^[-•*]\s+(.*)$/);
+      if (m) {
+        if (!inList) { html += '<ul>'; inList = true; }
+        html += '<li>' + escapeHtml(m[1]) + '</li>';
+      } else {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += (html && !html.endsWith('</ul>') ? '<br>' : '') + escapeHtml(l);
+      }
+    });
+    if (inList) html += '</ul>';
+    return html;
+  }
+
+  function importFromCopilot() {
+    const raw = document.getElementById('nd-ai-response').value;
+    const r = parseCopilotResponse(raw);
+    if (!r) { alert('Je ne trouve pas de JSON valide dans la réponse collée.'); return; }
+    const str = (v) => (v === undefined || v === null ? '' : String(v).trim());
+    const client = str(r.client) || document.getElementById('nd-client').value.trim();
+    const titre = str(r.titre) || document.getElementById('nd-titre').value.trim();
+    if (!client || !titre) { alert('La réponse ne contient pas de client ou de titre : complète-les dans le formulaire puis recommence.'); return; }
+
+    const type = str(r.type).toLowerCase().startsWith('pre') ? 'preconf' : 'normal';
+    const fields = {};
+    let paramRevealedState = true;
+    if (type === 'normal') {
+      fields['in-config'] = String(aiDays(r.parametrage_j));
+      fields['in-install'] = String(aiDays(r.installation_j));
+      fields['in-dev'] = String(aiDays(r.developpement_j));
+      fields['in-connecteurs-f'] = String(aiDays(r.connecteurs_j));
+      fields['in-detail'] = aiTextToRichHtml(r.detail_parametrage);
+      fields['in-connecteurs-detail'] = aiTextToRichHtml(r.detail_connecteurs);
+      fields['in-ateliers-detail'] = aiTextToRichHtml(r.detail_ateliers);
+      // Même logique que le gate : sans aucun jour saisi, on reste sur l'écran de paramétrage.
+      paramRevealedState = aiDays(r.parametrage_j) + aiDays(r.installation_j) + aiDays(r.developpement_j) > 0;
+    }
+
+    const now = new Date().toISOString();
+    const d = {
+      id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      client, titre,
+      demande: str(r.demande) || document.getElementById('nd-demande').value.trim(),
+      demandeur: str(r.demandeur) || document.getElementById('nd-demandeur').value.trim(),
+      jira: document.getElementById('nd-jira').value.trim(),
+      statut: STATUTS[0],
+      date_creation: now, date_maj: now,
+      type, total_forfait: '', total_tma: '',
+      etat_json: JSON.stringify({ currentType: type, atelierTouched: false, paramRevealed: paramRevealedState, manualTouched: [], fields }),
+      mail_html: '', mail_texte: '',
+      numero_commande: '', temps_passe_forfait: '', temps_passe_tma: ''
+    };
+    demandes.push(d);
+    dirtyDemandeIds.add(d.id);
+    saveDemandeurSuggestion(d.demandeur);
+    cancelNewDemandeForm();
+    commitLocal();
+    openDemande(d.id);
+    // Le calculateur vient de tout recalculer : on enregistre les totaux et le mail obtenus.
+    syncCurrentDemandeFromCalculator();
+    commitLocal();
+    const justif = str(r.justification);
+    if (justif) alert('Pré-remplissage fait. À relire !\n\nCopilot s’est appuyé sur : ' + justif);
   }
 
   function deleteDemande(id) {
