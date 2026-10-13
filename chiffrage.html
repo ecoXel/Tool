@@ -1240,6 +1240,7 @@
         <p><strong>Gestion de projet (20%)</strong> : 1 kick-off, 30 min de coproj/semaine, 1 copil/mois</p>
         <p><strong>Spec</strong> : X ateliers de 2h + 1 atelier de validation inclus → X / 2 + 0,5 j au forfait (nombre d'ateliers proposé par défaut selon le paramétrage)</p>
         <p><strong>Base de calcul</strong> : paramétrage seul (installation et développement autonomes, n'entrent pas dans le calcul des autres lignes)</p>
+        <p><strong>Installation</strong> (saisie à la main, jamais calculée) : repère — cloud 0,5 j ; on-premise 2 j minimum + 1 j par environnement hors prod (intégration + prod = 3 j). Montée de version ou reprise de l'existant : dans le paramétrage, pas en installation.</p>
         <p><strong>Recette (30%)</strong> : présentation Key Users incluse ; 75% forfait / 25% TMA, avec un minimum de 1 j en forfait dès que la recette dépasse 1 j</p>
         <p><strong>MEP</strong> : 0,5j par env hors prod (0 uniquement en production)</p>
         <p><strong>Doc (10%)</strong> : DEX, DAT, passation support</p>
@@ -3424,20 +3425,16 @@
     let paramRevealedState = true;
     let atelierTouchedState = false;
 
-    // Hébergement + environnements hors prod : l'installation est calculée ici avec la règle
-    // maison plutôt que laissée à l'IA (cloud : 0,5 j ; on-premise : 2 j + 1 j par environnement
-    // hors prod, ex. intégration + prod = 3 j). Sans hébergement précisé : jours fournis par l'IA.
+    // Hébergement + environnements hors prod : repris dans la description et la ligne MEP.
+    // L'installation n'est jamais remplie par l'import (ni calcul ni IA) : elle se saisit à la main
+    // (repère dans le rappel de calcul : cloud 0,5 j ; on-premise 2 j + 1 j par environnement hors prod).
     const hebergementRaw = str(r.hebergement || r.environnement);
-    const heb = hebergementRaw.toLowerCase();
-    const isCloud = heb.includes('cloud');
-    const isOnPrem = !isCloud && /prem|site|local/.test(heb);
     const envRaw = parseInt(r.environnements_hors_prod, 10);
     const envHorsProd = isFinite(envRaw) && envRaw >= 0 ? envRaw : null;
-    const installDays = isCloud ? 0.5 : isOnPrem ? 2 + (envHorsProd || 0) : aiDays(r.installation_j);
 
     if (type === 'normal') {
       fields['in-config'] = String(aiDays(r.parametrage_j));
-      fields['in-install'] = String(installDays);
+      fields['in-install'] = '0';
       fields['in-dev'] = String(aiDays(r.developpement_j));
       fields['in-connecteurs-f'] = String(aiDays(r.connecteurs_j));
       fields['in-detail'] = aiTextToRichHtml(r.detail_parametrage);
@@ -3450,7 +3447,7 @@
       const nbAteliers = String(r.detail_ateliers || '').split(/\r?\n/).filter(l => /^\s*[-•*]\s+\S/.test(l)).length;
       if (nbAteliers > 0) { fields['in-ateliers'] = String(Math.min(nbAteliers, 20)); atelierTouchedState = true; }
       // Même logique que le gate : sans aucun jour saisi, on reste sur l'écran de paramétrage.
-      paramRevealedState = aiDays(r.parametrage_j) + installDays + aiDays(r.developpement_j) > 0;
+      paramRevealedState = aiDays(r.parametrage_j) + aiDays(r.developpement_j) > 0;
     }
 
     const contexte = [];
@@ -3686,7 +3683,8 @@
   // Remplacé : jours, hébergement/environnements, textes de détail, liste des ateliers,
   // description. Ajouté : justification (notes internes), points à vérifier (commentaire).
   // Jamais touché : client, titre, demandeur, statut, Jira, dates, type, lignes forcées à la main.
-  const REIMPORT_DAYS = [['in-config', 'Paramétrage'], ['in-install', 'Installation'], ['in-dev', 'Développement'], ['in-connecteurs-f', 'Connecteurs']];
+  // (L'installation n'en fait pas partie : saisie à la main, jamais modifiée par un import.)
+  const REIMPORT_DAYS = [['in-config', 'Paramétrage'], ['in-dev', 'Développement'], ['in-connecteurs-f', 'Connecteurs']];
   const REIMPORT_TEXTS = [['in-detail', 'Détail paramétrage'], ['in-connecteurs-detail', 'Détail connecteurs'], ['in-ateliers-detail', 'Liste des ateliers']];
   let reimportPending = null; // { r, source, plan } prêt à appliquer
 
@@ -3735,7 +3733,6 @@
       hebergement: heb.trim(),
       environnements_hors_prod: f['in-env'] !== undefined ? parseInt(f['in-env'], 10) || 0 : 1,
       parametrage_j: isProjet ? num('in-config') : 0,
-      installation_j: isProjet ? num('in-install') : 0,
       developpement_j: isProjet ? num('in-dev') : 0,
       connecteurs_j: isProjet ? num('in-connecteurs-f') : 0,
       detail_parametrage: richToAiText(f['in-detail']),
@@ -3807,7 +3804,7 @@
     const r = list[0];
     const has = (k) => Object.prototype.hasOwnProperty.call(r, k);
     const SOURCE_KEYS = {
-      'in-config': ['parametrage_j'], 'in-install': ['installation_j', 'hebergement', 'environnement'],
+      'in-config': ['parametrage_j'],
       'in-dev': ['developpement_j'], 'in-connecteurs-f': ['connecteurs_j'],
       'in-detail': ['detail_parametrage'], 'in-connecteurs-detail': ['detail_connecteurs'], 'in-ateliers-detail': ['detail_ateliers']
     };
@@ -3842,7 +3839,7 @@
 
     box.innerHTML = (lines.length ? '<ul>' + lines.join('') + '</ul>' : '<div class="reimport-warn">Aucun changement par rapport à la demande actuelle.</div>')
       + notes.map(n => `<div class="reimport-warn">${escapeHtml(n)}</div>`).join('')
-      + '<div class="reimport-hint">Inchangés : client, titre, demandeur, statut, Jira, lignes modifiées à la main, et tout champ absent du JSON.</div>';
+      + '<div class="reimport-hint">Inchangés : client, titre, demandeur, statut, Jira, installation, lignes modifiées à la main, et tout champ absent du JSON.</div>';
     if (lines.length) {
       reimportPending = { nd, plan, source: sourceName || ('reimport-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)) };
       btn.disabled = false;

@@ -43,7 +43,8 @@ Pour chaque demande :
 1. Client final, demandeur (commercial ou contact) et résumé de la demande en quelques phrases.
 2. Type : "preconf" pour une installation préconfigurée standard à forfait fixe, sinon "projet".
 3. Hébergement : "cloud" ou "on-premise", et nombre d'environnements HORS production
-   (ex : intégration + production = 1). Ne chiffre pas l'installation : l'outil la calcule.
+   (ex : intégration + production = 1). Ne chiffre pas l'installation : elle est saisie à la main.
+   Une montée de version ou une reprise de l'existant se chiffre dans le paramétrage.
    Si l'hébergement n'est pas connu, laisse "" et signale-le dans "points_a_verifier".
 4. Paramétrage (jours, par pas de 0,5) : tout ce qui se fait en natif DocuWare. Détaille-le ligne par
    ligne en commençant par la quantité dès que possible : nombre d'armoires (par type), de workflows,
@@ -92,10 +93,10 @@ Réponds avec un seul bloc de code JSON, au format exact suivant (pour plusieurs
 ```
 
 Ce que l'outil en fait :
-- `hebergement` + `environnements_hors_prod` → **installation** calculée (cloud : 0,5 j ;
-  on-premise : 2 j + 1 j par environnement hors prod) et nombre d'environnements de la **MEP**.
-  Hébergement et environnements sont aussi ajoutés à la fin du résumé de la demande.
-  Sans hébergement, l'outil reprend `installation_j` s'il est fourni (sinon 0).
+- `hebergement` + `environnements_hors_prod` → ajoutés à la fin du résumé de la demande ;
+  le nombre d'environnements alimente la ligne **MEP**.
+- **Installation** : jamais remplie par l'import (ni calcul, ni IA) ; elle se saisit à la main.
+  Repère dans le rappel de calcul : cloud 0,5 j ; on-premise 2 j + 1 j par environnement hors prod.
 - `detail_ateliers` → liste reprise dans le mail ; **nombre d'ateliers = nombre de lignes**.
 - `justification` → copiée dans les **notes internes** (bloc 🔒 repliable sous la demande initiale,
   jamais repris dans le mail) et affichée au survol du repère 🤖.
