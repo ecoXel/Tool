@@ -1083,7 +1083,7 @@
   <div id="view-param" class="hidden">
     <div class="param-section">
       <div class="param-title">Fichier partagé</div>
-      <p class="param-help">Choisis le dossier OneDrive qui contient le CSV des chiffrages. Le même dossier sert à l’historique pour l’IA (<code>historique-ia.csv</code>, réécrit à chaque enregistrement) et aux chiffrages en attente d’import (<code>chiffrages-en-attente/</code>, créé automatiquement).</p>
+      <p class="param-help">Choisis le dossier OneDrive qui contient le CSV des chiffrages. Le même dossier sert à l’historique pour l’IA (<code>historique-ia.md</code>, réécrit à chaque enregistrement) et aux chiffrages en attente d’import (<code>chiffrages-en-attente/</code>, créé automatiquement).</p>
     <div class="file-status-bar">
         <span id="file-status-text">—</span>
         <div class="file-status-actions">
@@ -2657,7 +2657,7 @@
       const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
       const csvNames = [];
       for await (const [name, h] of dir.entries()) {
-        if (h.kind === 'file' && /\.csv$/i.test(name) && name !== HISTORY_FILE) csvNames.push(name);
+        if (h.kind === 'file' && /\.csv$/i.test(name) && name !== OLD_HISTORY_FILE) csvNames.push(name);
       }
       let name;
       if (csvNames.length === 1) {
@@ -3287,7 +3287,8 @@
   // Format attendu et consignes de l'agent : voir copilot-agent.md.
   // ═══════════════════════════════════════════════════════════
   const INBOX_DIR = 'chiffrages-en-attente';
-  const HISTORY_FILE = 'historique-ia.csv';
+  const HISTORY_FILE = 'historique-ia.md';     // Markdown : lisible par Copilot (qui ne lit pas les CSV)
+  const OLD_HISTORY_FILE = 'historique-ia.csv'; // ancien format, à ne pas prendre pour la base
 
   // Extrait le premier objet JSON du texte (tolère un ```json … ``` ou une phrase autour).
   function parseAiJson(text) {
@@ -3545,29 +3546,59 @@
     if (parts.length) showToast(parts.join('\n'), invalid.length ? 'warn' : 'info');
   }
 
-  // Version allégée du CSV, réécrite à chaque enregistrement, pour servir de base à l'agent :
-  // uniquement des colonnes lisibles (pas de JSON du calculateur ni de HTML de mail).
-  const HISTORY_COLUMNS = ['client', 'titre', 'demandeur', 'type', 'statut', 'date_demande', 'parametrage_j', 'installation_j', 'developpement_j', 'connecteurs_j', 'total_forfait', 'total_tma', 'demande', 'detail_parametrage', 'detail_connecteurs', 'detail_ateliers'];
+  // Historique pour l'agent Copilot, réécrit à chaque enregistrement : un fichier Markdown avec
+  // une section par chiffrage (titre "Client — Titre"), pour que chaque chiffrage reste entier
+  // quand Copilot découpe le document. Uniquement des informations lisibles (pas de JSON du
+  // calculateur ni de HTML de mail) ; versions archivées exclues.
+  function mdText(v) { return String(v || '').replace(/\r/g, '').trim(); }
+  function mdList(html) {
+    const t = htmlToPlainText(html || '').split('\n').map(l => l.trim()).filter(Boolean)
+      .map(l => '- ' + l.replace(/^[•\-*]\s*/, ''));
+    return t.join('\n');
+  }
+  function buildHistoryMarkdown(rows) {
+    const list = rows.filter(d => d.type && d.statut !== 'Archivé')
+      .sort((a, b) => (b.date_creation || '').localeCompare(a.date_creation || ''));
+    const out = [
+      '# Historique des chiffrages DocuWare',
+      '',
+      'Généré automatiquement par l’outil de chiffrage le ' + new Date().toLocaleString('fr-FR') + ' — ' + list.length + ' chiffrage(s).',
+      'Jours en jours-homme. « Jours saisis » = postes estimés (paramétrage, installation, développement, connecteurs) ;',
+      'gestion de projet, spécifications/ateliers, recette, mise en production, documentation et VSR sont calculés',
+      'par l’outil à partir du paramétrage et inclus dans les totaux. Le statut « Validé » signifie que le client a commandé.',
+      ''
+    ];
+    list.forEach(d => {
+      let f = {};
+      try { f = (JSON.parse(d.etat_json || '{}').fields) || {}; } catch (e) { f = {}; }
+      const isProjet = d.type === 'normal';
+      const n = (id) => fmtNum(parseTotalNum(f[id]));
+      out.push('## ' + mdText(d.client) + ' — ' + mdText(d.titre), '');
+      out.push('- Statut : ' + (d.statut || '—'));
+      out.push('- Type : ' + (isProjet ? 'Projet' : 'Préconf (forfait fixe)'));
+      if (d.date_creation) out.push('- Date de la demande : ' + d.date_creation.slice(0, 10));
+      if (d.demandeur) out.push('- Demandeur : ' + mdText(d.demandeur));
+      if (isProjet) {
+        out.push('- Jours saisis : paramétrage ' + n('in-config') + ' · installation ' + n('in-install') + ' · développement ' + n('in-dev') + ' · connecteurs ' + n('in-connecteurs-f'));
+        if (f['in-ateliers']) out.push('- Ateliers : ' + f['in-ateliers'] + ' (+ 1 atelier de validation)');
+      }
+      out.push('- Total : ' + fmtCell(d.total_forfait) + ' j au forfait' + (d.total_tma ? ' + ' + fmtCell(d.total_tma) + ' j en TMA' : ''));
+      const demande = mdText(d.demande).replace(/\n{2,}/g, '\n'); // texte brut (pas du HTML)
+      if (demande) out.push('', '**Demande** : ' + demande.replace(/\n/g, '  \n'));
+      [['in-detail', 'Détail du paramétrage'], ['in-connecteurs-detail', 'Connecteurs'], ['in-ateliers-detail', 'Ateliers']].forEach(([id, label]) => {
+        const l = mdList(f[id]);
+        if (l) out.push('', '**' + label + '** :', l);
+      });
+      out.push('');
+    });
+    return out.join('\n');
+  }
   async function writeHistoryFile(rows) {
     if (!dirHandle) return;
     try {
-      const lines = [HISTORY_COLUMNS.join(',')];
-      rows.filter(d => d.type).forEach(d => {
-        let f = {};
-        try { f = (JSON.parse(d.etat_json || '{}').fields) || {}; } catch (e) { f = {}; }
-        const n = (id) => (d.type === 'normal' ? (f[id] || '0') : '');
-        const txt = (id) => htmlToPlainText(f[id] || '');
-        lines.push([
-          d.client, d.titre, d.demandeur, d.type === 'preconf' ? 'Préconf' : 'Projet', d.statut,
-          (d.date_creation || '').slice(0, 10),
-          n('in-config'), n('in-install'), n('in-dev'), n('in-connecteurs-f'),
-          d.total_forfait, d.total_tma,
-          htmlToPlainText(d.demande || ''), txt('in-detail'), txt('in-connecteurs-detail'), txt('in-ateliers-detail')
-        ].map(csvField).join(','));
-      });
       const fh = await dirHandle.getFileHandle(HISTORY_FILE, { create: true });
       const w = await fh.createWritable();
-      await w.write('﻿' + lines.join('\r\n') + '\r\n');
+      await w.write(buildHistoryMarkdown(rows));
       await w.close();
     } catch (e) {
       console.error('historique IA', e); // pas bloquant : le CSV principal, lui, est bien enregistré

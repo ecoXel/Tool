@@ -24,9 +24,9 @@ Dans Microsoft 365 Copilot → **Créer un agent** (Agent Builder) :
 
 1. **Nom** : Pré-chiffrage DocuWare.
 2. **Instructions** : coller le bloc de la section 2.
-3. **Connaissances** : ajouter `historique-ia.csv`, qui se trouve dans le dossier partagé à côté du
-   CSV (voir section 4). Si le format CSV n'est pas accepté comme source, le signaler : l'outil peut
-   écrire l'historique dans un autre format.
+3. **Connaissances** : ajouter `historique-ia.md`, qui se trouve dans le dossier partagé à côté du
+   CSV (voir section 4). Fichier Markdown, une section par chiffrage (client, titre, statut, jours
+   saisis, totaux, demande, détails), réécrit à chaque « Enregistrer ».
 4. Créer, puis l'utiliser dans Copilot ou Outlook : sur le mail du commercial → « Pré-chiffre ce mail ».
 
 ## 2. Instructions de l'agent (à coller)
@@ -55,7 +55,7 @@ Pour chaque demande :
    Ne compte jamais deux fois un même élément entre paramétrage et connecteurs.
 7. Ateliers : donne la liste des ateliers recommandés, un atelier de 2h par ligne. N'ajoute pas
    l'atelier de validation (il est inclus d'office). Le nombre de lignes fixe le nombre d'ateliers.
-8. Estime les jours en t'appuyant sur les chiffrages comparables de historique-ia.csv (privilégie le
+8. Estime les jours en t'appuyant sur les chiffrages comparables de historique-ia.md (privilégie le
    statut "Validé"). La justification DOIT citer au moins un chiffrage de l'historique (client + titre)
    et expliquer l'écart ; si aucun n'est comparable, écris-le explicitement.
 9. N'invente rien : information absente = champ texte vide (""). Liste ce qui manque et qui change
@@ -127,7 +127,7 @@ au survol. Comme pour une saisie à la main, elles sont en local jusqu'à « Enr
    Un champ absent du JSON n'est pas modifié ; client, titre, demandeur, statut, Jira et lignes
    forcées à la main ne le sont jamais.
 
-**Historique pour l'agent** : `historique-ia.csv` est réécrit à côté du CSV à chaque « Enregistrer »,
+**Historique pour l'agent** : `historique-ia.md` est réécrit à côté du CSV à chaque « Enregistrer »,
 à condition d'avoir connecté le **dossier** partagé (« Choisir le dossier partagé… »).
 
 **Option** : tout fichier `.json` déposé à la main dans `chiffrages-en-attente/` (créé
