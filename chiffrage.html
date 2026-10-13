@@ -1083,7 +1083,7 @@
   <div id="view-param" class="hidden">
     <div class="param-section">
       <div class="param-title">Fichier partagé</div>
-      <p class="param-help">Choisis le dossier OneDrive qui contient le CSV des chiffrages. Le même dossier sert à l’historique pour l’IA (<code>historique-ia.md</code>, réécrit à chaque enregistrement) et aux chiffrages en attente d’import (<code>chiffrages-en-attente/</code>, créé automatiquement).</p>
+      <p class="param-help">Choisis le dossier OneDrive qui contient le CSV des chiffrages. Le même dossier sert à l’historique pour l’IA (<code>historique-ia.txt</code>, réécrit à chaque enregistrement) et aux chiffrages en attente d’import (<code>chiffrages-en-attente/</code>, créé automatiquement).</p>
     <div class="file-status-bar">
         <span id="file-status-text">—</span>
         <div class="file-status-actions">
@@ -3287,7 +3287,9 @@
   // Format attendu et consignes de l'agent : voir copilot-agent.md.
   // ═══════════════════════════════════════════════════════════
   const INBOX_DIR = 'chiffrages-en-attente';
-  const HISTORY_FILE = 'historique-ia.md';     // Markdown : lisible par Copilot (qui ne lit pas les CSV)
+  // Texte structuré façon Markdown, en .txt : Copilot n'accepte comme source ni CSV ni .md
+  // (formats acceptés : doc/docx, pdf, ppt/pptx, txt, xls/xlsx, html sur SharePoint).
+  const HISTORY_FILE = 'historique-ia.txt';
   const OLD_HISTORY_FILE = 'historique-ia.csv'; // ancien format, à ne pas prendre pour la base
 
   // Extrait le premier objet JSON du texte (tolère un ```json … ``` ou une phrase autour).
@@ -3546,7 +3548,7 @@
     if (parts.length) showToast(parts.join('\n'), invalid.length ? 'warn' : 'info');
   }
 
-  // Historique pour l'agent Copilot, réécrit à chaque enregistrement : un fichier Markdown avec
+  // Historique pour l'agent Copilot, réécrit à chaque enregistrement : un texte structuré avec
   // une section par chiffrage (titre "Client — Titre"), pour que chaque chiffrage reste entier
   // quand Copilot découpe le document. Uniquement des informations lisibles (pas de JSON du
   // calculateur ni de HTML de mail) ; versions archivées exclues.
