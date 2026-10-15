@@ -60,6 +60,9 @@ Pour chaque demande :
    et expliquer l'écart ; si aucun n'est comparable, écris-le explicitement.
 9. N'invente rien : information absente = champ texte vide (""). Liste ce qui manque et qui change
    l'estimation dans "points_a_verifier".
+10. Plusieurs lots de paramétrage dans le même projet (socle, lot 1, lot 2…) : utilise "lots", avec
+   pour chaque lot son nom, ses jours de paramétrage, son détail et ses ateliers, À LA PLACE de
+   "parametrage_j", "detail_parametrage" et "detail_ateliers". Un seul lot : n'utilise pas "lots".
 
 Réponds avec un seul bloc de code JSON, au format exact suivant (pour plusieurs demandes, une liste
 [ {...}, {...} ]) :
@@ -68,6 +71,9 @@ Réponds avec un seul bloc de code JSON, au format exact suivant (pour plusieurs
   "parametrage_j": 0, "developpement_j": 0, "connecteurs_j": 0,
   "detail_parametrage": "", "detail_connecteurs": "", "detail_ateliers": "",
   "justification": "", "points_a_verifier": "" }
+Avec plusieurs lots, remplace "parametrage_j", "detail_parametrage" et "detail_ateliers" par :
+  "lots": [ { "nom": "Socle", "parametrage_j": 0, "detail_parametrage": "", "detail_ateliers": "" },
+            { "nom": "Lot 1", "parametrage_j": 0, "detail_parametrage": "", "detail_ateliers": "" } ]
 ```
 
 ## 3. Format du JSON
@@ -98,6 +104,11 @@ Ce que l'outil en fait :
 - **Installation** : jamais remplie par l'import (ni calcul, ni IA) ; elle se saisit à la main.
   Repère dans le rappel de calcul : cloud 0,5 j ; on-premise 2 j + 1 j par environnement hors prod.
 - `detail_ateliers` → liste reprise dans le mail ; **nombre d'ateliers = nombre de lignes**.
+- `lots` (facultatif) → un **bloc** par lot dans la section « Détail » du calculateur, chacun avec ses
+  ateliers (1 atelier de validation inclus par bloc) et son paramétrage ; gestion de projet, recette,
+  doc et VSR sont calculés sur le total des paramétrages. Au réimport, `lots` remplace tous les blocs
+  (dans l'ordre ; les saisies manuelles d'un bloc suivent le bloc de même position) ; sans `lots`,
+  les champs à plat ne touchent que le premier bloc.
 - `justification` → copiée dans les **notes internes** (bloc 🔒 repliable sous la demande initiale,
   jamais repris dans le mail) et affichée au survol du repère 🤖.
 - `points_a_verifier` → mis dans le **commentaire** en bas du calculateur (⚠️ ce commentaire est repris

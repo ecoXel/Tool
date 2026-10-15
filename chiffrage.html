@@ -199,6 +199,21 @@
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
   .ia-flag { margin-left: 4px; font-size: 11px; cursor: help; }
+  /* ── Détail : blocs (lots de paramétrage) ── */
+  .detail-head { border-bottom: none !important; padding-bottom: 6px; }
+  .blocs-zone { margin-left: 10px; padding-left: 14px; border-left: 2px solid var(--accent-dim); display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .bloc { background: var(--bg); border: 1px solid var(--border); border-right: none; padding: 6px 0 4px 12px; }
+  .bloc.bloc-single { background: none; border: none; padding: 0; }
+  .bloc-head { display: flex; align-items: center; gap: 8px; padding-right: 10px; }
+  .bloc-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+  .bloc-name { width: 220px; font-weight: 600; font-size: 14px; margin-left: 0; }
+  .bloc-remove { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; }
+  .bloc-remove:hover { color: #f87171; }
+  .tbl-row.bloc-row { border-bottom: none; padding: 8px 0; align-items: start; }
+  .bloc-row + .bloc-row { border-top: 1px dashed var(--border); }
+  .bloc-sub-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .bloc-row .richtext-wrap { margin-top: 6px; }
+  .bloc-add { align-self: flex-start; }
   .demande-card {
     background: var(--surface);
     border: 1px solid var(--accent-dim);
@@ -1238,14 +1253,15 @@
       <summary>Rappel calcul : Projet normal</summary>
       <div class="rappel-body">
         <p><strong>Gestion de projet (20%)</strong> : 1 kick-off, 30 min de coproj/semaine, 1 copil/mois</p>
-        <p><strong>Spec</strong> : X ateliers de 2h + 1 atelier de validation inclus → X / 2 + 0,5 j au forfait (nombre d'ateliers proposé par défaut selon le paramétrage)</p>
+        <p><strong>Détail</strong> : un ou plusieurs blocs (socle, lots…), chacun avec ses ateliers et son paramétrage ; gestion de projet, recette, doc et VSR se calculent sur le total des paramétrages</p>
+        <p><strong>Ateliers (par bloc)</strong> : X ateliers de 2h + 1 atelier de validation inclus → X / 2 + 0,5 j au forfait (nombre d'ateliers proposé par défaut selon le paramétrage du bloc)</p>
         <p><strong>Base de calcul</strong> : paramétrage seul (installation et développement autonomes, n'entrent pas dans le calcul des autres lignes)</p>
         <p><strong>Installation</strong> (saisie à la main, jamais calculée) : repère — cloud 0,5 j ; on-premise 2 j minimum + 1 j par environnement hors prod (intégration + prod = 3 j). Montée de version ou reprise de l'existant : dans le paramétrage, pas en installation.</p>
         <p><strong>Recette (30%)</strong> : présentation Key Users incluse ; 75% forfait / 25% TMA, avec un minimum de 1 j en forfait dès que la recette dépasse 1 j</p>
         <p><strong>MEP</strong> : 0,5j par env hors prod (0 uniquement en production)</p>
         <p><strong>Doc (10%)</strong> : DEX, DAT, passation support</p>
         <p><strong>VSR (10%)</strong> : accompagnement et correction post-livraison</p>
-        <p><strong>Petit paramétrage (≤ 3 j)</strong> : forfait plancher au lieu du calcul en % — Gestion de projet 0,5 j, Spécification 0 j (sauf si le nombre d'ateliers est modifié à la main), Recette et ajustement 0,5 j, Documentation 0 j (incluse dans la MEP), VSR 0 j</p>
+        <p><strong>Petit paramétrage (total ≤ 3 j)</strong> : forfait plancher au lieu du calcul en % — Gestion de projet 0,5 j, Ateliers 0 j (sauf si le nombre d'ateliers est modifié à la main), Recette et ajustement 0,5 j, Documentation 0 j (incluse dans la MEP), VSR 0 j</p>
       </div>
     </details>
     <details id="rappel-preconf" class="hidden">
@@ -1269,7 +1285,14 @@
   // ── État global ─────────────────────────────────────────
   let currentType = null;
   let currentMailRecapText = ''; // version compacte du mail (une ligne par poste), pour la colonne CSV mail_texte
-  let atelierTouched = false;
+  // Blocs du détail (lots de paramétrage) : clés numériques ; le bloc 1 garde les identifiants
+  // historiques (in-config, in-detail, in-ateliers, v-spec-f…), les suivants un suffixe "-bN".
+  // Une demande enregistrée avant les blocs se relit donc telle quelle comme un seul bloc.
+  let blocKeys = [1];
+  let atelierTouched = new Set(); // blocs dont le nombre d'ateliers a été modifié à la main
+  function blocSuffix(k) { return k === 1 ? '' : '-b' + k; }
+  function blocId(base, k) { return base + blocSuffix(k); }
+  function defaultBlocName(i) { return i === 0 ? 'Socle' : 'Lot ' + i; }
   let paramRevealed = false; // true une fois le paramétrage rempli -> tableau complet affiché
   let manualTouched = new Set(); // ids des cases calculées que l'utilisateur a modifiées à la main
 
@@ -1504,7 +1527,8 @@
   // bouton "Nouveau chiffrage" que par l'ouverture d'une demande, qui elle garde son contexte).
   function resetCalculatorUI() {
     currentType = null;
-    atelierTouched = false;
+    atelierTouched = new Set();
+    blocKeys = [1];
     paramRevealed = false;
     manualTouched = new Set();
     document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
@@ -1582,7 +1606,8 @@
 
   function setType(type, btn) {
     currentType = type;
-    atelierTouched = false;
+    atelierTouched = new Set();
+    blocKeys = [1];
     paramRevealed = false;
     manualTouched = new Set();
     applyTypeChrome(type);
@@ -1692,6 +1717,95 @@
     </div>
   `;
 
+  // ── Section "Détail" du type Projet : un bloc par lot de paramétrage, chacun avec ses ateliers
+  // (jours calculés : nb / 2 + 0,5, validation incluse par bloc) et son paramétrage (jours saisis).
+  // Avec un seul bloc, pas d'en-tête (nom / suppression) : l'écran reste celui d'avant les blocs.
+  function renderDetailBlocs() {
+    const multi = blocKeys.length > 1;
+    const blocs = blocKeys.map((k, i) => {
+      const at = blocId('in-ateliers', k), specF = blocId('v-spec-f', k), specT = blocId('v-spec-t', k);
+      const head = multi ? `
+        <div class="bloc-head">
+          <span class="bloc-label">Bloc</span>
+          <input type="text" class="card-input bloc-name" id="${blocId('bloc-nom', k)}" value="${escapeHtml(defaultBlocName(i))}" placeholder="Nom du bloc" oninput="update()">
+          <span class="card-spacer"></span>
+          ${k !== 1 ? `<button type="button" class="bloc-remove" onclick="removeBloc(${k})" title="Supprimer ce bloc">✕</button>` : ''}
+        </div>` : '';
+      return `
+      <div class="bloc${multi ? '' : ' bloc-single'}">
+        ${head}
+        <div class="tbl-row tbl-row-split bloc-row">
+          <div>
+            <div class="bloc-sub-name">Ateliers</div>
+            ${qtyLine('atelier(s) de 2h + 1 atelier de validation inclus', at, 1, 1, 20, 1, `onAteliersChange(${k})`)}
+            <div class="tbl-desc"><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé</div>
+            ${richTextField(blocId('in-ateliers-detail', k), "Liste / contenu des ateliers prévus (repris dans le mail)")}
+          </div>
+          <input type="number" class="tbl-input-root" id="${specF}" value="0" min="0" step="0.5" oninput="markTouched('${specF}'); update();">
+          <span class="tbl-unit">j</span>
+          <input type="number" class="tbl-input-root" id="${specT}" value="0" min="0" step="0.5" oninput="update()">
+          <span class="tbl-unit">j</span>
+        </div>
+        <div class="tbl-row tbl-row-split bloc-row">
+          <div>
+            <div class="bloc-sub-name">Paramétrage</div>
+            ${richTextField(blocId('in-detail', k), "Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)")}
+          </div>
+          <input type="number" class="tbl-input-root" id="${blocId('in-config', k)}" value="0" min="0" step="0.5" oninput="update()">
+          <span class="tbl-unit">j</span>
+          <input type="number" class="tbl-input-root" id="${blocId('in-config-tma', k)}" value="0" min="0" step="0.5" oninput="update()">
+          <span class="tbl-unit">j</span>
+        </div>
+      </div>`;
+    }).join('');
+    return `
+      <div class="tbl-row detail-head">
+        <div>
+          <div class="tbl-name">Détail</div>
+          <div class="tbl-desc" id="d-detail-base"></div>
+        </div>
+      </div>
+      <div class="blocs-zone">
+        ${blocs}
+        <button type="button" class="btn-action bloc-add" onclick="addBloc()">➕ Ajouter un bloc</button>
+      </div>`;
+  }
+
+  // Ajout / suppression de bloc : on capture l'état, on redessine le tableau, on réapplique.
+  function rebuildNormalBody(mutate) {
+    const st = captureFullState();
+    mutate(st);
+    document.getElementById('chiffrage-body').innerHTML = TEMPLATES.normal.full();
+    const apply = () => Object.keys(st.fields).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) setFieldRawValue(el, st.fields[id]);
+    });
+    apply(); update(); apply(); update();
+  }
+  function addBloc() {
+    const k = Math.max.apply(null, blocKeys) + 1;
+    rebuildNormalBody(st => {
+      if (blocKeys.length === 1 && !st.fields['bloc-nom']) st.fields['bloc-nom'] = defaultBlocName(0);
+      blocKeys.push(k);
+      st.fields[blocId('bloc-nom', k)] = defaultBlocName(blocKeys.length - 1);
+    });
+    const name = document.getElementById(blocId('bloc-nom', k));
+    if (name) { name.focus(); name.select(); }
+  }
+  function removeBloc(k) {
+    if (k === 1 || !blocKeys.includes(k)) return;
+    const txt = (id) => { const el = document.getElementById(blocId(id, k)); return el ? htmlToPlainText(getFieldRawValue(el)).trim() : ''; };
+    const hasContent = val(blocId('in-config', k)) > 0 || txt('in-detail') || txt('in-ateliers-detail');
+    if (hasContent && !confirm('Supprimer ce bloc et son contenu ?')) return;
+    rebuildNormalBody(st => {
+      blocKeys = blocKeys.filter(x => x !== k);
+      const suffix = blocSuffix(k);
+      Object.keys(st.fields).forEach(id => { if (id.endsWith(suffix)) delete st.fields[id]; });
+      manualTouched.delete(blocId('v-spec-f', k));
+      atelierTouched.delete(k);
+    });
+  }
+
   // ── Templates HTML par type ────────────────────────────────
   const TEMPLATES = {
 
@@ -1713,22 +1827,7 @@
         <span class="tbl-unit">j</span>
       </div>
 
-      <div class="tbl-row tbl-row-split tbl-row-attached">
-        <div>
-          <div class="tbl-name">Spécification et ateliers</div>
-          <div class="tbl-desc" id="d-spec"></div>
-          <div class="tbl-desc"><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé</div>
-        </div>
-        <input type="number" class="tbl-input-root" id="v-spec-f" value="0" min="0" step="0.5" oninput="markTouched('v-spec-f'); update();">
-        <span class="tbl-unit">j</span>
-        <input type="number" class="tbl-input-root" id="v-spec-t" value="0" min="0" step="0.5" oninput="update()">
-        <span class="tbl-unit">j</span>
-      </div>
-      <div class="tbl-row tbl-row-split tbl-row-detail">
-        <div>
-          ${richTextField('in-ateliers-detail', "Liste / contenu des ateliers prévus (repris dans le mail)")}
-        </div>
-      </div>
+      ${renderDetailBlocs()}
 
       <div class="tbl-row tbl-row-split">
         <div><div class="tbl-name">Installation</div></div>
@@ -1743,18 +1842,6 @@
         <span class="tbl-unit">j</span>
         <input type="number" class="tbl-input-root" id="in-dev-tma" value="0" min="0" step="0.5" oninput="update()">
         <span class="tbl-unit">j</span>
-      </div>
-      <div class="tbl-row tbl-row-split tbl-row-attached">
-        <div><div class="tbl-name">Paramétrage</div></div>
-        <input type="number" class="tbl-input-root" id="in-config" value="0" min="0" step="0.5" oninput="update()">
-        <span class="tbl-unit">j</span>
-        <input type="number" class="tbl-input-root" id="in-config-tma" value="0" min="0" step="0.5" oninput="update()">
-        <span class="tbl-unit">j</span>
-      </div>
-      <div class="tbl-row tbl-row-split tbl-row-detail">
-        <div>
-          ${richTextField('in-detail', "Précise ici le contenu spécifique pour ce client (modules, spécificités techniques, etc.)")}
-        </div>
       </div>
 
       <div class="tbl-row tbl-row-split tbl-row-attached">
@@ -1951,11 +2038,11 @@
   // Installation et Développement sont autonomes, ils n'entrent plus dans cette base
   // (sinon ils font bouger tout le reste).
   function paramSum() {
-    return val('in-config');
+    return blocKeys.reduce((sum, k) => sum + val(blocId('in-config', k)), 0);
   }
   // Pour savoir si le gate doit se déclencher : n'importe quel champ rempli, installation incluse.
   function hasAnyParam() {
-    return val('in-install') + val('in-dev') + val('in-config') > 0;
+    return val('in-install') + val('in-dev') + paramSum() > 0;
   }
   // Le HTML assaini (sanitizeRichHtml) ne produit jamais de <ul>/<ol>/<li> avec attributs —
   // on peut donc les cibler par simple recherche/remplacement sans risque, pour resserrer les
@@ -1969,10 +2056,11 @@
       .replace(/<li>/g, '<li style="margin:0;padding:0;">');
   }
 
-  function paramDetail() {
-    const el = document.getElementById('in-detail');
+  function richMailValue(id) {
+    const el = document.getElementById(id);
     return el ? styleListsForMail(getFieldRawValue(el).trim()) : '';
   }
+  function paramDetail(k) { return richMailValue(blocId('in-detail', k || 1)); }
 
   function update() {
     if (!currentType) return;
@@ -1991,14 +2079,20 @@
   function updateNormal() {
     const p = paramSum(); // base = paramétrage seul (installation et développement autonomes, exclus)
 
-    const dSpec = document.getElementById('d-spec');
-    if (!dSpec.querySelector('#in-ateliers')) {
-      dSpec.innerHTML = qtyLine('atelier(s) de 2h + 1 atelier de validation inclus', 'in-ateliers', defaultAteliers(p), 1, 20, 1, 'onAteliersChange()');
-    } else if (!atelierTouched) {
-      document.getElementById('in-ateliers').value = defaultAteliers(p);
-    }
-    const nbAteliers = ival('in-ateliers');
-    const specDays = roundUp(0.5 * (nbAteliers + 1));
+    // Ateliers par bloc : nombre par défaut d'après le paramétrage du bloc (sauf saisie à la main),
+    // puis nb / 2 + 0,5 j (1 atelier de validation inclus par bloc).
+    const multiBlocs = blocKeys.length > 1;
+    const blocs = blocKeys.map((k, i) => {
+      const pk = val(blocId('in-config', k));
+      const atEl = document.getElementById(blocId('in-ateliers', k));
+      if (atEl && !atelierTouched.has(k)) atEl.value = defaultAteliers(pk);
+      const nb = ival(blocId('in-ateliers', k));
+      const nameEl = document.getElementById(blocId('bloc-nom', k));
+      const nom = multiBlocs ? ((nameEl && nameEl.value.trim()) || defaultBlocName(i)) : '';
+      return { k, nb, nom, specDays: roundUp(0.5 * (nb + 1)) };
+    });
+    const baseEl = document.getElementById('d-detail-base');
+    if (baseEl) baseEl.textContent = 'Ateliers et paramétrage' + (multiBlocs ? ', par bloc' : '') + ' — base de calcul (gestion, recette, doc, VSR) : ' + fmtNum(p) + ' j de paramétrage';
 
     const dMep = document.getElementById('d-mep');
     if (!dMep.querySelector('#in-env')) {
@@ -2028,14 +2122,13 @@
     const gestionForfait = roundUp(gestionTotal * 0.5);
     const gestionTMA = gestionTotal - gestionForfait;
 
-    // Spécification : nb ateliers / 2 + 0,5 en forfait. Pour un petit paramétrage, 0 par défaut,
-    // sauf si le nombre d'ateliers a été modifié à la main : on applique alors la formule.
-    const specForfait = (isSmallParam && !atelierTouched) ? 0 : specDays;
+    // Ateliers : pour un petit paramétrage (total ≤ 3 j), 0 par défaut, sauf si le nombre
+    // d'ateliers du bloc a été modifié à la main : on applique alors la formule.
+    blocs.forEach(b => setComputed(blocId('v-spec-f', b.k), (isSmallParam && !atelierTouched.has(b.k)) ? 0 : b.specDays));
 
-    // Installation / Développement / Paramétrage : forfait = saisi, TMA = saisie manuelle
+    // Installation / Développement : forfait = saisi, TMA = saisie manuelle
     const installF = val('in-install'), installT = val('in-install-tma');
     const devF = val('in-dev'), devT = val('in-dev-tma');
-    const configF = val('in-config'), configT = val('in-config-tma');
 
     // Recette : 75% forfait / 25% TMA, mini 1j forfait dès que le total dépasse 1j, sinon tout en forfait
     const recetteTotal = isSmallParam ? 0.5 : roundUp(p * 0.30);
@@ -2055,7 +2148,6 @@
     // affichée (calculée ou modifiée) pour les totaux et le mail.
     setComputed('v-gestion-f', gestionForfait);
     setComputed('v-gestion-t', gestionTMA);
-    setComputed('v-spec-f', specForfait);
     setComputed('v-recette-f', recetteForfait);
     setComputed('v-recette-t', recetteTMA);
     setComputed('v-mep-f', mepDays);
@@ -2065,7 +2157,6 @@
 
     const gestionForfaitFinal = val('v-gestion-f');
     const gestionTMAFinal = val('v-gestion-t');
-    const specForfaitFinal = val('v-spec-f');
     const recetteForfaitFinal = val('v-recette-f');
     const recetteTMAFinal = val('v-recette-t');
     const mepDaysFinal = val('v-mep-f');
@@ -2073,17 +2164,23 @@
     const vsrDaysFinal = val('v-vsr-t');
     const formDaysFinal = val('v-formation-t');
     // Cases sans règle de calcul (0 par défaut), saisissables si besoin
-    const specTMA = val('v-spec-t'), mepTMA = val('v-mep-t'), docTMA = val('v-doc-t');
+    const mepTMA = val('v-mep-t'), docTMA = val('v-doc-t');
     const vsrForfait = val('v-vsr-f'), formForfait = val('v-formation-f');
-    const ateliersDetailEl = document.getElementById('in-ateliers-detail');
-    const ateliersDetail = ateliersDetailEl ? styleListsForMail(getFieldRawValue(ateliersDetailEl).trim()) : '';
+    // Une paire de lignes (Ateliers, Paramétrage) par bloc ; avec plusieurs blocs, le nom du bloc suit.
+    const blocItems = [];
+    blocs.forEach(b => {
+      const suffixLabel = b.nom ? ' — ' + escapeHtml(b.nom) : '';
+      const atDetail = richMailValue(blocId('in-ateliers-detail', b.k));
+      const paDetail = paramDetail(b.k);
+      blocItems.push({ label: 'Ateliers' + suffixLabel, desc: '<strong>Forfait :</strong> ' + b.nb + ' atelier' + (b.nb > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé' + (atDetail ? '<br><span style="font-style:italic;">' + atDetail + '</span>' : ''), forfait: val(blocId('v-spec-f', b.k)), tma: val(blocId('v-spec-t', b.k)) });
+      blocItems.push({ label: 'Paramétrage' + suffixLabel, desc: paDetail ? '<span style="font-style:italic;">' + paDetail + '</span>' : '', forfait: val(blocId('in-config', b.k)), tma: val(blocId('in-config-tma', b.k)) });
+    });
 
     const items = [
       { label: 'Gestion de projet', desc: '<strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> Comitologie client (coproj, copil, etc.)', forfait: gestionForfaitFinal, tma: gestionTMAFinal },
-      { label: 'Spécification et ateliers', desc: '<strong>Forfait :</strong> ' + nbAteliers + ' atelier' + (nbAteliers > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé' + (ateliersDetail ? '<br><span style="font-style:italic;">' + ateliersDetail + '</span>' : ''), forfait: specForfaitFinal, tma: specTMA },
+      ...blocItems,
       { label: 'Installation', desc: '', forfait: installF, tma: installT },
       { label: 'Développement', desc: '', forfait: devF, tma: devT },
-      { label: 'Paramétrage', desc: paramDetail() ? '<span style="font-style:italic;">' + paramDetail() + '</span>' : '', forfait: configF, tma: configT },
       { label: 'Connecteurs', desc: connDetail, forfait: connForfait, tma: connTMA },
       { label: 'Recette et ajustement', desc: '<strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement', forfait: recetteForfaitFinal, tma: recetteTMAFinal },
       { label: 'Mise en production', desc: nbEnv > 0 ? nbEnv + ' environnement' + (nbEnv > 1 ? 's' : '') : '', forfait: mepDaysFinal, tma: mepTMA },
@@ -2095,11 +2192,12 @@
     updateTotalAndMail(items, 'split');
   }
 
-  function onAteliersChange() {
-    atelierTouched = true;
+  function onAteliersChange(k) {
+    k = k || 1;
+    atelierTouched.add(k);
     // Changer le nombre d'ateliers est une intention explicite : la case forfait reprend la
     // valeur calculée même si elle avait été saisie à la main auparavant.
-    manualTouched.delete('v-spec-f');
+    manualTouched.delete(blocId('v-spec-f', k));
     updateNormal();
   }
 
@@ -3418,6 +3516,27 @@
     return html;
   }
 
+  // Lots de paramétrage du JSON : tableau "lots" s'il y en a un, sinon les champs à plat (1 lot).
+  function aiLots(r) {
+    const lots = Array.isArray(r.lots) ? r.lots.filter(x => x && typeof x === 'object') : [];
+    return lots.length ? lots : [{ parametrage_j: r.parametrage_j, detail_parametrage: r.detail_parametrage, detail_ateliers: r.detail_ateliers }];
+  }
+  function aiAteliersCount(txt) {
+    return String(txt || '').split(/\r?\n/).filter(l => /^\s*[-•*]\s+\S/.test(l)).length;
+  }
+  // Champs du calculateur pour un lot (bloc k, position i) ; ajoute k à touched si le nombre
+  // d'ateliers vient de la liste.
+  function aiLotFields(lot, k, i, multi, touched) {
+    const f = {};
+    f[blocId('in-config', k)] = String(aiDays(lot.parametrage_j));
+    f[blocId('in-detail', k)] = aiTextToRichHtml(lot.detail_parametrage);
+    f[blocId('in-ateliers-detail', k)] = aiTextToRichHtml(lot.detail_ateliers);
+    const nb = aiAteliersCount(lot.detail_ateliers);
+    if (nb > 0) { f[blocId('in-ateliers', k)] = String(Math.min(nb, 20)); if (touched) touched.push(k); }
+    if (multi) f[blocId('bloc-nom', k)] = String(lot.nom || '').trim() || defaultBlocName(i);
+    return f;
+  }
+
   // Construit une demande complète à partir du JSON de l'IA (null si rien d'exploitable).
   function demandeFromAiResult(r, sourceName) {
     const str = (v) => (v === undefined || v === null ? '' : String(v).trim());
@@ -3426,7 +3545,8 @@
     const type = str(r.type).toLowerCase().startsWith('pre') ? 'preconf' : 'normal';
     const fields = {};
     let paramRevealedState = true;
-    let atelierTouchedState = false;
+    let blocsState = [1];
+    const touchedBlocs = [];
 
     // Hébergement + environnements hors prod : repris dans la description et la ligne MEP.
     // L'installation n'est jamais remplie par l'import (ni calcul ni IA) : elle se saisit à la main
@@ -3436,21 +3556,20 @@
     const envHorsProd = isFinite(envRaw) && envRaw >= 0 ? envRaw : null;
 
     if (type === 'normal') {
-      fields['in-config'] = String(aiDays(r.parametrage_j));
       fields['in-install'] = '0';
       fields['in-dev'] = String(aiDays(r.developpement_j));
       fields['in-connecteurs-f'] = String(aiDays(r.connecteurs_j));
-      fields['in-detail'] = aiTextToRichHtml(r.detail_parametrage);
       fields['in-connecteurs-detail'] = aiTextToRichHtml(r.detail_connecteurs);
-      fields['in-ateliers-detail'] = aiTextToRichHtml(r.detail_ateliers);
       // Nombre d'environnements hors prod → ligne Mise en production.
       if (envHorsProd !== null) fields['in-env'] = String(Math.min(envHorsProd, 10));
-      // Nombre d'ateliers = nombre de lignes de la liste recommandée (l'atelier de validation
-      // est inclus d'office par la règle) ; sinon, le nombre par défaut selon le paramétrage.
-      const nbAteliers = String(r.detail_ateliers || '').split(/\r?\n/).filter(l => /^\s*[-•*]\s+\S/.test(l)).length;
-      if (nbAteliers > 0) { fields['in-ateliers'] = String(Math.min(nbAteliers, 20)); atelierTouchedState = true; }
+      // Blocs du détail : "lots" (plusieurs lots de paramétrage) ou, à défaut, les champs à plat
+      // (un seul bloc). Nombre d'ateliers d'un bloc = nombre de lignes de sa liste d'ateliers
+      // (l'atelier de validation est inclus d'office) ; sinon, le nombre par défaut.
+      const lots = aiLots(r);
+      blocsState = lots.map((_, i) => i + 1);
+      lots.forEach((lot, i) => Object.assign(fields, aiLotFields(lot, i + 1, i, lots.length > 1, touchedBlocs)));
       // Même logique que le gate : sans aucun jour saisi, on reste sur l'écran de paramétrage.
-      paramRevealedState = aiDays(r.parametrage_j) + aiDays(r.developpement_j) > 0;
+      paramRevealedState = lots.reduce((sum, lot) => sum + aiDays(lot.parametrage_j), 0) + aiDays(r.developpement_j) > 0;
     }
 
     const contexte = [];
@@ -3473,7 +3592,7 @@
       statut: STATUTS[0],
       date_creation: now, date_maj: now,
       type, total_forfait: '', total_tma: '',
-      etat_json: JSON.stringify({ currentType: type, atelierTouched: atelierTouchedState, paramRevealed: paramRevealedState, manualTouched: [], fields }),
+      etat_json: JSON.stringify({ currentType: type, atelierTouched: touchedBlocs.includes(1), atelierTouchedBlocs: touchedBlocs, blocs: blocsState, paramRevealed: paramRevealedState, manualTouched: [], fields }),
       mail_html: '', mail_texte: '', commentaire,
       numero_commande: '', temps_passe_forfait: '', temps_passe_tma: '',
       ia_source: sourceName, ia_justification: str(r.justification),
@@ -3580,14 +3699,28 @@
       out.push('- Type : ' + (isProjet ? 'Projet' : 'Préconf (forfait fixe)'));
       if (d.date_creation) out.push('- Date de la demande : ' + d.date_creation.slice(0, 10));
       if (d.demandeur) out.push('- Demandeur : ' + mdText(d.demandeur));
+      let st = {};
+      try { st = JSON.parse(d.etat_json || '{}'); } catch (e) { st = {}; }
+      const keys = Array.isArray(st.blocs) && st.blocs.length ? st.blocs.map(Number) : [1];
+      const multi = isProjet && keys.length > 1;
+      const nomBloc = (k, i) => f[blocId('bloc-nom', k)] || defaultBlocName(i);
       if (isProjet) {
-        out.push('- Jours saisis : paramétrage ' + n('in-config') + ' · installation ' + n('in-install') + ' · développement ' + n('in-dev') + ' · connecteurs ' + n('in-connecteurs-f'));
-        if (f['in-ateliers']) out.push('- Ateliers : ' + f['in-ateliers'] + ' (+ 1 atelier de validation)');
+        const totalParam = keys.reduce((sum, k) => sum + parseTotalNum(f[blocId('in-config', k)]), 0);
+        const parBloc = multi ? ' (' + keys.map((k, i) => nomBloc(k, i) + ' ' + n(blocId('in-config', k))).join(' · ') + ')' : '';
+        out.push('- Jours saisis : paramétrage ' + fmtNum(totalParam) + parBloc + ' · installation ' + n('in-install') + ' · développement ' + n('in-dev') + ' · connecteurs ' + n('in-connecteurs-f'));
+        const at = keys.map((k, i) => f[blocId('in-ateliers', k)] ? (multi ? nomBloc(k, i) + ' ' : '') + f[blocId('in-ateliers', k)] : '').filter(Boolean);
+        if (at.length) out.push('- Ateliers : ' + at.join(' · ') + ' (+ 1 atelier de validation' + (multi ? ' par bloc' : '') + ')');
       }
       out.push('- Total : ' + fmtCell(d.total_forfait) + ' j au forfait' + (d.total_tma ? ' + ' + fmtCell(d.total_tma) + ' j en TMA' : ''));
       const demande = mdText(d.demande).replace(/\n{2,}/g, '\n'); // texte brut (pas du HTML)
       if (demande) out.push('', '**Demande** : ' + demande.replace(/\n/g, '  \n'));
-      [['in-detail', 'Détail du paramétrage'], ['in-connecteurs-detail', 'Connecteurs'], ['in-ateliers-detail', 'Ateliers']].forEach(([id, label]) => {
+      const sections = [];
+      (isProjet ? keys : [1]).forEach((k, i) => {
+        const suffix = multi ? ' — ' + nomBloc(k, i) : '';
+        sections.push([blocId('in-ateliers-detail', k), 'Ateliers' + suffix], [blocId('in-detail', k), 'Détail du paramétrage' + suffix]);
+      });
+      sections.push(['in-connecteurs-detail', 'Connecteurs']);
+      sections.forEach(([id, label]) => {
         const l = mdList(f[id]);
         if (l) out.push('', '**' + label + '** :', l);
       });
@@ -3717,8 +3850,32 @@
   // description. Ajouté : justification (notes internes), points à vérifier (commentaire).
   // Jamais touché : client, titre, demandeur, statut, Jira, dates, type, lignes forcées à la main.
   // (L'installation n'en fait pas partie : saisie à la main, jamais modifiée par un import.)
-  const REIMPORT_DAYS = [['in-config', 'Paramétrage'], ['in-dev', 'Développement'], ['in-connecteurs-f', 'Connecteurs']];
-  const REIMPORT_TEXTS = [['in-detail', 'Détail paramétrage'], ['in-connecteurs-detail', 'Détail connecteurs'], ['in-ateliers-detail', 'Liste des ateliers']];
+  // Hors blocs du détail (traités à part : ateliers + paramétrage par bloc).
+  const REIMPORT_DAYS = [['in-dev', 'Développement'], ['in-connecteurs-f', 'Connecteurs']];
+  const REIMPORT_TEXTS = [['in-connecteurs-detail', 'Détail connecteurs']];
+  const BLOC_BASES = ['in-config', 'in-config-tma', 'in-detail', 'in-ateliers', 'in-ateliers-detail', 'v-spec-f', 'v-spec-t', 'bloc-nom'];
+
+  // Lignes d'aperçu pour un bloc : ancien bloc ok (ou undefined si nouveau) → valeurs prévues set (bloc nk).
+  function blocDiffLines(oldF, ok, set, nk, label) {
+    const out = [];
+    const lbl = (base) => base + (label ? ' — ' + escapeHtml(label) : '');
+    const has = (b) => set[blocId(b, nk)] !== undefined;
+    const oldVal = (b) => ok === undefined ? undefined : oldF[blocId(b, ok)];
+    if (has('in-config')) {
+      const a = parseTotalNum(oldVal('in-config')), b = parseTotalNum(set[blocId('in-config', nk)]);
+      if (a !== b || ok === undefined) out.push(`<li><b>${lbl('Paramétrage')}</b> : ${ok === undefined ? 'nouveau bloc, ' : fmtNum(a) + ' j → '}<b>${fmtNum(b)} j</b></li>`);
+    }
+    if (has('in-ateliers')) {
+      const a = oldVal('in-ateliers') !== undefined ? parseInt(oldVal('in-ateliers'), 10) : null, b = parseInt(set[blocId('in-ateliers', nk)], 10);
+      if (a !== b) out.push(`<li><b>${lbl('Ateliers')}</b> : ${ok === undefined ? '' : (a === null ? 'par défaut' : a) + ' → '}<b>${b}</b></li>`);
+    }
+    [['in-detail', 'Détail paramétrage'], ['in-ateliers-detail', 'Liste des ateliers']].forEach(([b, name]) => {
+      if (!has(b)) return;
+      const a = htmlToPlainText(oldVal(b) || '').trim(), v = htmlToPlainText(set[blocId(b, nk)] || '').trim();
+      if (a !== v && (ok !== undefined || v)) out.push(`<li><b>${lbl(name)}</b> : ${v ? (a ? 'modifié' : 'ajouté') : 'vidé'}</li>`);
+    });
+    return out;
+  }
   let reimportPending = null; // { r, source, plan } prêt à appliquer
 
   function openReimport() {
@@ -3754,7 +3911,8 @@
 
   // Chiffrage actuel au format JSON de l'agent, pour une mise à jour par Copilot.
   function currentDemandeAsAiJson(d) {
-    const f = stateFields(d).fields;
+    const { st, fields: f } = stateFields(d);
+    const keys = Array.isArray(st.blocs) && st.blocs.length ? st.blocs.map(Number) : [1];
     const isProjet = d.type === 'normal';
     const heb = (String(d.demande || '').match(/Hébergement : ([^—\n]+)/) || [])[1] || '';
     const description = String(d.demande || '').replace(/\n*Hébergement : [^\n]*$/, '').trim();
@@ -3765,12 +3923,19 @@
       type: isProjet ? 'projet' : 'preconf',
       hebergement: heb.trim(),
       environnements_hors_prod: f['in-env'] !== undefined ? parseInt(f['in-env'], 10) || 0 : 1,
-      parametrage_j: isProjet ? num('in-config') : 0,
+      // Plusieurs blocs : "lots" ; un seul : champs à plat (format habituel de l'agent).
+      lots: isProjet && keys.length > 1 ? keys.map((k, i) => ({
+        nom: f[blocId('bloc-nom', k)] || defaultBlocName(i),
+        parametrage_j: num(blocId('in-config', k)),
+        detail_parametrage: richToAiText(f[blocId('in-detail', k)]),
+        detail_ateliers: richToAiText(f[blocId('in-ateliers-detail', k)])
+      })) : undefined,
+      parametrage_j: isProjet && keys.length > 1 ? undefined : (isProjet ? num('in-config') : 0),
       developpement_j: isProjet ? num('in-dev') : 0,
       connecteurs_j: isProjet ? num('in-connecteurs-f') : 0,
-      detail_parametrage: richToAiText(f['in-detail']),
+      detail_parametrage: isProjet && keys.length > 1 ? undefined : richToAiText(f['in-detail']),
       detail_connecteurs: richToAiText(f['in-connecteurs-detail']),
-      detail_ateliers: richToAiText(f['in-ateliers-detail']),
+      detail_ateliers: isProjet && keys.length > 1 ? undefined : richToAiText(f['in-ateliers-detail']),
       justification: d.ia_justification || '',
       points_a_verifier: ''
     };
@@ -3842,7 +4007,56 @@
       'in-detail': ['detail_parametrage'], 'in-connecteurs-detail': ['detail_connecteurs'], 'in-ateliers-detail': ['detail_ateliers']
     };
     const provided = (id) => SOURCE_KEYS[id].some(has);
+    let blocPlan = null;
     if (isProjet) {
+      // ── Blocs du détail : "lots" → restructuration complète (un bloc par lot, dans l'ordre) ;
+      // champs à plat → bloc 1 seulement. Les saisies manuelles d'un bloc (TMA du paramétrage et
+      // des ateliers, ateliers forcés) suivent le bloc de même position.
+      const oldSt = stateFields(d).st;
+      const oldKeys = Array.isArray(oldSt.blocs) && oldSt.blocs.length ? oldSt.blocs.map(Number) : [1];
+      const oldTouched = new Set((oldSt.atelierTouchedBlocs || []).map(Number));
+      if (oldSt.atelierTouched) oldTouched.add(1);
+      const oldNames = oldKeys.map((k, i) => oldKeys.length > 1 ? (oldF[blocId('bloc-nom', k)] || defaultBlocName(i)) : '');
+      const hasLots = has('lots') && Array.isArray(r.lots) && r.lots.some(x => x && typeof x === 'object');
+      const flatKeys = ['parametrage_j', 'detail_parametrage', 'detail_ateliers'].filter(has);
+      if (hasLots) {
+        const newKeys = stateFields(nd).st.blocs || [1];
+        const multi = newKeys.length > 1;
+        const set = {}, remove = [], remap = {}, touched = [];
+        oldKeys.forEach(ok => BLOC_BASES.forEach(b => remove.push(blocId(b, ok))));
+        newKeys.forEach((nk, i) => {
+          const ok = oldKeys[i];
+          ['in-config', 'in-detail', 'in-ateliers-detail', 'in-ateliers', 'bloc-nom'].forEach(b => {
+            if (newF[blocId(b, nk)] !== undefined) set[blocId(b, nk)] = newF[blocId(b, nk)];
+          });
+          if (newF[blocId('in-ateliers', nk)] !== undefined) touched.push(nk);
+          if (ok !== undefined) {
+            ['in-config-tma', 'v-spec-t', 'v-spec-f'].forEach(b => { if (oldF[blocId(b, ok)] !== undefined) set[blocId(b, nk)] = oldF[blocId(b, ok)]; });
+            remap[blocId('v-spec-f', ok)] = blocId('v-spec-f', nk);
+            if (newF[blocId('in-ateliers', nk)] === undefined && oldTouched.has(ok) && oldF[blocId('in-ateliers', ok)] !== undefined) {
+              set[blocId('in-ateliers', nk)] = oldF[blocId('in-ateliers', ok)];
+              touched.push(nk);
+            }
+          }
+          const label = multi ? (newF[blocId('bloc-nom', nk)] || defaultBlocName(i)) : '';
+          const renamed = ok !== undefined && multi && oldKeys.length > 1 && oldNames[i] !== label;
+          if (renamed) lines.push(`<li><b>Bloc renommé</b> : ${escapeHtml(oldNames[i])} → <b>${escapeHtml(label)}</b></li>`);
+          lines.push(...blocDiffLines(oldF, ok, set, nk, label));
+        });
+        oldKeys.slice(newKeys.length).forEach((ok, j) => lines.push(`<li><b>Bloc supprimé</b> : ${escapeHtml(oldNames[newKeys.length + j] || 'bloc ' + (newKeys.length + j + 1))}</li>`));
+        blocPlan = { keys: newKeys, set, remove, remap, touched };
+      } else if (flatKeys.length) {
+        const set = {}, touched = [];
+        if (has('parametrage_j')) set['in-config'] = newF['in-config'];
+        if (has('detail_parametrage')) set['in-detail'] = newF['in-detail'];
+        if (has('detail_ateliers')) {
+          set['in-ateliers-detail'] = newF['in-ateliers-detail'];
+          if (newF['in-ateliers'] !== undefined) { set['in-ateliers'] = newF['in-ateliers']; touched.push(1); }
+        }
+        lines.push(...blocDiffLines(oldF, 1, set, 1, oldNames[0]));
+        blocPlan = { keys: oldKeys, set, remove: [], remap: null, touched };
+      }
+
       REIMPORT_DAYS.filter(([id]) => provided(id)).forEach(([id, label]) => {
         const a = parseTotalNum(oldF[id]), b = parseTotalNum(newF[id]);
         plan[id] = String(b);
@@ -3852,11 +4066,6 @@
         const a = oldF['in-env'] !== undefined ? parseInt(oldF['in-env'], 10) : 1, b = parseInt(newF['in-env'], 10);
         plan['in-env'] = String(b);
         if (a !== b) lines.push(`<li><b>Environnements hors prod</b> : ${a} → <b>${b}</b></li>`);
-      }
-      if (newF['in-ateliers'] !== undefined && has('detail_ateliers')) {
-        const a = oldF['in-ateliers'] !== undefined ? parseInt(oldF['in-ateliers'], 10) : null, b = parseInt(newF['in-ateliers'], 10);
-        plan['in-ateliers'] = String(b);
-        if (a !== b) lines.push(`<li><b>Ateliers</b> : ${a === null ? 'par défaut' : a} → <b>${b}</b></li>`);
       }
       REIMPORT_TEXTS.filter(([id]) => provided(id)).forEach(([id, label]) => {
         const a = htmlToPlainText(oldF[id] || '').trim(), b = htmlToPlainText(newF[id] || '').trim();
@@ -3874,7 +4083,7 @@
       + notes.map(n => `<div class="reimport-warn">${escapeHtml(n)}</div>`).join('')
       + '<div class="reimport-hint">Inchangés : client, titre, demandeur, statut, Jira, installation, lignes modifiées à la main, et tout champ absent du JSON.</div>';
     if (lines.length) {
-      reimportPending = { nd, plan, source: sourceName || ('reimport-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)) };
+      reimportPending = { nd, plan, blocPlan, source: sourceName || ('reimport-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)) };
       btn.disabled = false;
     }
   }
@@ -3882,7 +4091,7 @@
   function applyReimport() {
     const d = currentDemandeId ? demandes.find(x => x.id === currentDemandeId) : null;
     if (!d || !reimportPending) return;
-    const { nd, plan, source } = reimportPending;
+    const { nd, plan, blocPlan, source } = reimportPending;
     const mode = document.querySelector('input[name="reimport-mode"]:checked').value;
     syncCurrentDemandeFromCalculator();
     const now = new Date();
@@ -3904,8 +4113,29 @@
     const { st, fields } = stateFields(d);
     Object.assign(fields, plan);
     const newState = Object.assign({ currentType: d.type, manualTouched: [] }, st, { fields });
-    if (plan['in-ateliers'] !== undefined) newState.atelierTouched = true;
-    if (d.type === 'normal' && parseTotalNum(fields['in-config']) + parseTotalNum(fields['in-install']) + parseTotalNum(fields['in-dev']) > 0) newState.paramRevealed = true;
+    if (blocPlan) {
+      blocPlan.remove.forEach(id => { delete fields[id]; });
+      Object.assign(fields, blocPlan.set);
+      newState.blocs = blocPlan.keys;
+      const oldTouched = new Set((st.atelierTouchedBlocs || []).map(Number));
+      if (st.atelierTouched) oldTouched.add(1);
+      let touched;
+      if (blocPlan.remap) {
+        // Restructuration : les cases ateliers forcées à la main suivent leur bloc.
+        touched = new Set(blocPlan.touched);
+        const oldManual = st.manualTouched || [];
+        const newManual = oldManual.filter(id => !/^v-spec-f/.test(id));
+        Object.keys(blocPlan.remap).forEach(o => { if (oldManual.includes(o)) newManual.push(blocPlan.remap[o]); });
+        newState.manualTouched = newManual;
+      } else {
+        touched = new Set([...oldTouched, ...blocPlan.touched]);
+      }
+      newState.atelierTouchedBlocs = Array.from(touched);
+      newState.atelierTouched = touched.has(1);
+    }
+    const blocsOfState = Array.isArray(newState.blocs) && newState.blocs.length ? newState.blocs.map(Number) : [1];
+    const paramTotal = blocsOfState.reduce((sum, k) => sum + parseTotalNum(fields[blocId('in-config', k)]), 0);
+    if (d.type === 'normal' && paramTotal + parseTotalNum(fields['in-install']) + parseTotalNum(fields['in-dev']) > 0) newState.paramRevealed = true;
     d.etat_json = JSON.stringify(newState);
     if (nd.demande) d.demande = nd.demande;
     if (nd.commentaire) d.commentaire = (d.commentaire ? d.commentaire + '<br>' : '') + nd.commentaire;
@@ -4009,7 +4239,9 @@
     document.querySelectorAll('#chiffrage-body input, #chiffrage-body textarea, #chiffrage-body [contenteditable]').forEach(el => { fields[el.id] = getFieldRawValue(el); });
     return {
       currentType,
-      atelierTouched,
+      atelierTouched: atelierTouched.has(1), // format historique (bloc 1)
+      atelierTouchedBlocs: Array.from(atelierTouched),
+      blocs: blocKeys.slice(),
       paramRevealed,
       manualTouched: Array.from(manualTouched),
       fields
@@ -4064,7 +4296,9 @@
     if (!state || !state.currentType) return; // rien à restaurer : on laisse l'écran vierge (aucun type choisi)
 
     currentType = state.currentType;
-    atelierTouched = !!state.atelierTouched;
+    blocKeys = Array.isArray(state.blocs) && state.blocs.length ? state.blocs.map(Number) : [1];
+    atelierTouched = new Set((state.atelierTouchedBlocs || []).map(Number));
+    if (state.atelierTouched) atelierTouched.add(1);
     manualTouched = new Set(state.manualTouched || []);
     paramRevealed = !!state.paramRevealed;
 
