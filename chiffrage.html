@@ -2178,17 +2178,24 @@
     // Cases sans règle de calcul (0 par défaut), saisissables si besoin
     const mepTMA = val('v-mep-t'), docTMA = val('v-doc-t');
     const vsrForfait = val('v-vsr-f'), formForfait = val('v-formation-f');
-    // Une paire de lignes (Ateliers, Paramétrage) par bloc ; avec plusieurs blocs, le nom du bloc suit.
+    // Une paire de lignes (Ateliers, Paramétrage) par bloc. Avec plusieurs blocs : une ligne
+    // d'en-tête par lot ("LOT nom", avec le total du lot, exclue des totaux généraux), puis ses
+    // deux lignes, sans séparation entre elles.
     const blocItems = [];
     blocs.forEach(b => {
-      const suffixLabel = b.nom ? ' — ' + escapeHtml(b.nom) : '';
       const atDetail = richMailValue(blocId('in-ateliers-detail', b.k));
       const paDetail = paramDetail(b.k);
       const atDesc = b.nb > 0
         ? '<strong>Forfait :</strong> ' + b.nb + ' atelier' + (b.nb > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé'
         : '<strong>TMA :</strong> 0,5 j par atelier demandé';
-      blocItems.push({ label: 'Ateliers' + suffixLabel, desc: atDesc + (atDetail ? '<br><span style="font-style:italic;">' + atDetail + '</span>' : ''), forfait: val(blocId('v-spec-f', b.k)), tma: val(blocId('v-spec-t', b.k)) });
-      blocItems.push({ label: 'Paramétrage' + suffixLabel, desc: paDetail ? '<span style="font-style:italic;">' + paDetail + '</span>' : '', forfait: val(blocId('in-config', b.k)), tma: val(blocId('in-config-tma', b.k)) });
+      const at = { label: 'Ateliers', desc: atDesc + (atDetail ? '<br><span style="font-style:italic;">' + atDetail + '</span>' : ''), forfait: val(blocId('v-spec-f', b.k)), tma: val(blocId('v-spec-t', b.k)) };
+      const pa = { label: 'Paramétrage', desc: paDetail ? '<span style="font-style:italic;">' + paDetail + '</span>' : '', forfait: val(blocId('in-config', b.k)), tma: val(blocId('in-config-tma', b.k)) };
+      if (multiBlocs) {
+        blocItems.push({ isLotHeader: true, label: 'LOT ' + escapeHtml(b.nom.replace(/^lot\s*/i, '')), forfait: at.forfait + pa.forfait, tma: at.tma + pa.tma });
+        blocItems.push(Object.assign(at, { sub: true }), Object.assign(pa, { sub: true, lotEnd: true }));
+      } else {
+        blocItems.push(at, pa);
+      }
     });
 
     const items = [
@@ -2263,7 +2270,7 @@
   // ── Total + mail (commun aux 3 types) ─────────────────────
   function updateTotalAndMail(items, mode) {
     if (mode === 'split') {
-      const numericItems = items.filter(it => !it.isNote);
+      const numericItems = items.filter(it => !it.isNote && !it.isLotHeader); // en-têtes de lot : déjà comptés via leurs lignes
       const totalForfait = numericItems.reduce((s, it) => s + it.forfait, 0);
       const totalTMA = numericItems.reduce((s, it) => s + it.tma, 0);
       const totalGrand = totalForfait + totalTMA;
@@ -2319,8 +2326,9 @@
     const lines = [];
     items.forEach(it => {
       if (it.isNote || (it.forfait === 0 && it.tma === 0)) return;
-      let line = it.label + ' : ' + fmtNum(it.forfait);
+      let line = (it.sub ? '   ' : '') + it.label + ' : ' + fmtNum(it.forfait);
       if (it.tma > 0) line += ' + TMA : ' + fmtNum(it.tma);
+      if (it.isLotHeader && lines.length) lines.push('');
       lines.push(line);
       const descBlock = recapDescBlock(it.desc);
       if (descBlock) lines.push(descBlock, '');
@@ -2358,6 +2366,29 @@
       if (it.forfait === 0 && it.tma === 0) return; // rien à afficher sur cette ligne
 
       const descStyle = 'color:#666;font-size:11px;';
+      if (it.isLotHeader) {
+        rows += `
+        <tr>
+          <td style="padding:7px 12px 3px 0;color:#1a6abf;font-weight:bold;letter-spacing:0.02em;">${it.label}</td>
+          <td style="padding:7px 0 3px;color:#1a6abf;font-weight:bold;text-align:right;white-space:nowrap;">${it.forfait > 0 ? fmt(it.forfait) : '—'}</td>
+          <td style="padding:7px 0 3px 12px;color:#555;font-weight:bold;text-align:right;white-space:nowrap;">${it.tma > 0 ? fmt(it.tma) : '—'}</td>
+        </tr>`;
+        return;
+      }
+      if (it.sub) {
+        // Ligne d'un lot : en retrait, chiffres plus discrets, trait seulement sous la dernière ligne du lot.
+        const border = it.lotEnd ? 'border-bottom:1px solid #eee;' : '';
+        rows += `
+        <tr>
+          <td style="padding:3px 12px 5px 14px;color:#222;font-weight:bold;${border}">
+            ${it.label}
+            ${it.desc ? '<br><span style="' + descStyle + '">' + it.desc + '</span>' : ''}
+          </td>
+          <td style="padding:3px 0 5px;color:#5b8fd0;text-align:right;white-space:nowrap;${border}">${it.forfait > 0 ? fmt(it.forfait) : ''}</td>
+          <td style="padding:3px 0 5px 12px;color:#888;text-align:right;white-space:nowrap;${border}">${it.tma > 0 ? fmt(it.tma) : ''}</td>
+        </tr>`;
+        return;
+      }
       rows += `
         <tr>
           <td style="padding:5px 12px 5px 0;color:#222;font-weight:bold;border-bottom:1px solid #eee;">
@@ -2400,7 +2431,7 @@
             <td style="padding:4px 0 4px 12px;color:#555;font-weight:bold;text-align:right;">${fmt(totalTMA)}</td>
           </tr>
           <tr>
-            <td colspan="3" style="padding:0 0 6px;color:#888;font-size:11px;font-style:italic;">* TMA : enveloppe prévisionnelle, consommée au réel ; si insuffisante, une commande supplémentaire pourra être demandée en cours de projet.</td>
+            <td colspan="3" style="padding:0 0 6px;color:#888;font-size:11px;font-style:italic;">* TMA : enveloppe prévisionnelle consommée au réel, complétable par une commande si besoin.</td>
           </tr>
           <tr>
             <td style="padding:6px 12px 8px 0;color:#222;font-weight:bold;border-top:1px solid #1a6abf;">Total</td>
