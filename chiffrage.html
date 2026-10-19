@@ -1054,7 +1054,7 @@
 
   <div id="view-commandes" class="hidden">
     <div class="commandes-section">
-      <div class="commandes-section-title">📤 Transmis — à traiter</div>
+      <div class="commandes-section-title">📤 Transmis à traiter</div>
       <table class="demandes-table">
         <thead>
           <tr>
@@ -1101,7 +1101,7 @@
       <div class="param-title">Fichier partagé</div>
       <p class="param-help">Choisis le dossier OneDrive qui contient le CSV des chiffrages. Le même dossier sert à l’historique pour l’IA (<code>historique-ia.txt</code>, réécrit à chaque enregistrement) et aux chiffrages en attente d’import (<code>chiffrages-en-attente/</code>, créé automatiquement).</p>
     <div class="file-status-bar">
-        <span id="file-status-text">—</span>
+        <span id="file-status-text"></span>
         <div class="file-status-actions">
           <button class="btn-action" id="btn-connect-file" onclick="connectFile()">Choisir le dossier partagé…</button>
           <button class="btn-action hidden" id="btn-reconnect-file" onclick="reconnectFile()">🔓 Reconnecter</button>
@@ -1147,7 +1147,7 @@
     <div class="card-meta">
       <div class="card-field">
         <div class="card-label">Demandeur</div>
-        <input type="text" id="dc-demandeur" class="card-input" list="demandeur-suggestions" placeholder="—" onchange="onCardFieldChange('demandeur', this)">
+        <input type="text" id="dc-demandeur" class="card-input" list="demandeur-suggestions" placeholder="À renseigner" onchange="onCardFieldChange('demandeur', this)">
       </div>
       <div class="card-field">
         <div class="card-label">Date de la demande</div>
@@ -1160,7 +1160,7 @@
       <div class="card-field">
         <div class="card-label">Ticket Jira</div>
         <div class="card-jira">
-          <input type="text" id="dc-jira" class="card-input" placeholder="—" onchange="onCardFieldChange('jira', this)">
+          <input type="text" id="dc-jira" class="card-input" placeholder="À renseigner" onchange="onCardFieldChange('jira', this)">
           <a id="dc-jira-link" class="card-jira-link hidden" target="_blank" rel="noopener" title="Ouvrir dans Jira">↗</a>
         </div>
       </div>
@@ -1180,7 +1180,7 @@
   </div>
 
   <div id="type-zone" class="hidden">
-    <div class="type-zone-hint">Choisis le type de chiffrage de cette demande — il ne pourra plus être changé.</div>
+    <div class="type-zone-hint">Choisis le type de chiffrage de cette demande : il ne pourra plus être changé.</div>
     <div class="type-bar">
       <button class="type-btn" data-type="preconf" onclick="setType('preconf', this)">Préconf</button>
       <button class="type-btn" data-type="normal" onclick="setType('normal', this)">Projet</button>
@@ -1211,7 +1211,7 @@
           <div class="total-label">Total</div>
           <div class="total-sub" id="total-sub"></div>
         </div>
-        <div class="total-value" id="total-display">—</div>
+        <div class="total-value" id="total-display"></div>
       </div>
 
       <div class="total-row hidden" id="total-block-split">
@@ -1219,11 +1219,11 @@
           <div class="total-label">Total</div>
           <div class="total-sub" id="total-sub-split"></div>
         </div>
-        <div class="total-value" id="total-display-grand">—</div>
+        <div class="total-value" id="total-display-grand"></div>
       </div>
 
       <div class="comment-block">
-        <label class="comment-label" for="chiffrage-comment">Commentaire (repris tel quel dans le mail, sous le total)</label>
+        <label class="comment-label" for="chiffrage-comment">Commentaire</label>
         <div class="richtext-wrap">
           <div class="richtext-toolbar">
             <button type="button" class="rt-btn" data-cmd="bold" onmousedown="event.preventDefault()" onclick="richExec('chiffrage-comment','bold')"><b>G</b></button>
@@ -1259,15 +1259,15 @@
       <summary>Rappel calcul : Projet normal</summary>
       <div class="rappel-body">
         <p><strong>Gestion de projet (20%)</strong> : 1 kick-off, 30 min de coproj/semaine, 1 copil/mois</p>
-        <p><strong>Détail</strong> : un ou plusieurs blocs (socle, lots…), chacun avec ses ateliers et son paramétrage ; gestion de projet, recette, doc et VSR se calculent sur le total des paramétrages</p>
-        <p><strong>Ateliers (par bloc)</strong> : X ateliers de 2h + 1 atelier de validation inclus → X / 2 + 0,5 j au forfait (nombre d'ateliers proposé par défaut selon le paramétrage du bloc)</p>
+        <p><strong>Détail</strong> : un ou plusieurs lots, chacun avec ses ateliers et ses paramétrages ; gestion de projet, recette, doc et VSR se calculent sur le total des paramétrages</p>
+        <p><strong>Ateliers (par lot)</strong> : X ateliers de 2h + 1 atelier de validation inclus → X / 2 + 0,5 j au forfait (nombre d'ateliers proposé par défaut selon le paramétrage du bloc)</p>
         <p><strong>Base de calcul</strong> : paramétrage seul (installation et développement autonomes, n'entrent pas dans le calcul des autres lignes)</p>
-        <p><strong>Installation</strong> (saisie à la main, jamais calculée) : repère — cloud 0,5 j ; on-premise 2 j minimum + 1 j par environnement hors prod (intégration + prod = 3 j). Montée de version ou reprise de l'existant : dans le paramétrage, pas en installation.</p>
+        <p><strong>Installation</strong> (saisie à la main, jamais calculée) : repère, cloud 0,5 j ; on-premise 2 j minimum + 1 j par environnement hors prod (intégration + prod = 3 j). Montée de version ou reprise de l'existant : dans le paramétrage, pas en installation.</p>
         <p><strong>Recette (30%)</strong> : présentation Key Users incluse ; 75% forfait / 25% TMA, avec un minimum de 1 j en forfait dès que la recette dépasse 1 j</p>
         <p><strong>MEP</strong> : 0,5j par env hors prod (0 uniquement en production)</p>
         <p><strong>Doc (10%)</strong> : DEX, DAT, passation support</p>
         <p><strong>VSR (10%)</strong> : accompagnement et correction post-livraison</p>
-        <p><strong>Petit paramétrage (total ≤ 3 j)</strong> : forfait plancher au lieu du calcul en % — Gestion de projet 0,5 j, Ateliers 0 j (sauf si le nombre d'ateliers est modifié à la main), Recette et ajustement 0,5 j, Documentation 0 j (incluse dans la MEP), VSR 0 j</p>
+        <p><strong>Petit paramétrage (total ≤ 3 j)</strong> : forfait plancher au lieu du calcul en % : Gestion de projet 0,5 j, Ateliers 0 j (sauf si le nombre d'ateliers est modifié à la main), Recette et ajustement 0,5 j, Documentation 0 j (incluse dans la MEP), VSR 0 j</p>
       </div>
     </details>
     <details id="rappel-preconf" class="hidden">
@@ -1334,7 +1334,7 @@
     return JIRA_BASE_URL + encodeURIComponent(ticket);
   }
   function jiraLink(ticket) {
-    if (!ticket) return '—';
+    if (!ticket) return '';
     return `<a href="${escapeHtml(jiraUrl(ticket))}" target="_blank" rel="noopener" class="jira-link">${escapeHtml(ticket)}</a>`;
   }
   function updateSyncBadge() {
@@ -1345,7 +1345,7 @@
     if (pending > 0) {
       el.classList.add('sync-pending');
       el.textContent = String(pending);
-      el.title = pending + (pending > 1 ? ' changements non enregistrés' : ' changement non enregistré') + ' dans le fichier partagé — clique pour enregistrer maintenant.';
+      el.title = pending + (pending > 1 ? ' changements non enregistrés' : ' changement non enregistré') + ' dans le fichier partagé : clique pour enregistrer maintenant.';
     } else if (fileHandle) {
       el.classList.add('sync-ok');
       el.textContent = '✓';
@@ -1353,7 +1353,7 @@
     } else {
       el.classList.add('sync-local');
       el.textContent = '○';
-      el.title = 'Travail local uniquement — connecte un fichier CSV partagé depuis le Suivi pour synchroniser avec l’équipe.';
+      el.title = 'Travail local uniquement : connecte un fichier CSV partagé depuis le Suivi pour synchroniser avec l’équipe.';
     }
   }
 
@@ -1715,7 +1715,7 @@
       <div class="col-head">TMA<span class="tma-star">*</span></div>
     </div>
     <div class="tbl-row tbl-row-split tbl-row-attached">
-      <div><div class="tbl-name">Paramétrage</div></div>
+      <div><div class="tbl-name">Paramétrages</div></div>
       <input type="number" class="tbl-input-root" id="in-config" value="0" min="0" step="0.5" oninput="update()">
       <span class="tbl-unit">j</span>
       <input type="number" class="tbl-input-root" id="in-config-tma" value="0" min="0" step="0.5" oninput="update()">
@@ -1737,10 +1737,9 @@
       const at = blocId('in-ateliers', k), specF = blocId('v-spec-f', k), specT = blocId('v-spec-t', k);
       const head = multi ? `
         <div class="bloc-head">
-          <span class="bloc-label">Bloc</span>
-          <input type="text" class="card-input bloc-name" id="${blocId('bloc-nom', k)}" value="${escapeHtml(defaultBlocName(i))}" placeholder="Nom du bloc" oninput="update()">
+          <input type="text" class="card-input bloc-name" id="${blocId('bloc-nom', k)}" value="${escapeHtml(defaultBlocName(i))}" placeholder="Nom du lot" oninput="update()">
           <span class="card-spacer"></span>
-          ${k !== 1 ? `<button type="button" class="bloc-remove" onclick="removeBloc(${k})" title="Supprimer ce bloc">✕</button>` : ''}
+          ${k !== 1 ? `<button type="button" class="bloc-remove" onclick="removeBloc(${k})" title="Supprimer ce lot">✕</button>` : ''}
         </div>` : '';
       return `
       <div class="bloc${multi ? '' : ' bloc-single'}">
@@ -1748,8 +1747,11 @@
         <div class="tbl-row tbl-row-split bloc-row">
           <div>
             <div class="bloc-sub-name">Ateliers</div>
-            ${qtyLine('atelier(s) de 2h + 1 atelier de validation inclus (0 = aucun atelier)', at, 1, 0, 20, 1, `onAteliersChange(${k})`)}
-            <div class="tbl-desc"><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé</div>
+            <div class="tbl-qty-line">
+              <span class="qty-hint"><strong>Inclus :</strong></span>
+              <input type="number" class="qty-input" id="${at}" value="1" min="0" max="20" step="1" oninput="onAteliersChange(${k})">
+              <span class="qty-hint">atelier(s) de 2h + 1 atelier de validation (0,5 j par atelier supplémentaire)</span>
+            </div>
           </div>
           <input type="number" class="tbl-input-root" id="${specF}" value="0" min="0" step="0.5" oninput="markTouched('${specF}'); update();">
           <span class="tbl-unit">j</span>
@@ -1759,7 +1761,7 @@
         </div>
         <div class="tbl-row tbl-row-split bloc-row">
           <div>
-            <div class="bloc-sub-name">Paramétrage</div>
+            <div class="bloc-sub-name">Paramétrages</div>
           </div>
           <input type="number" class="tbl-input-root" id="${blocId('in-config', k)}" value="0" min="0" step="0.5" oninput="update()">
           <span class="tbl-unit">j</span>
@@ -1778,7 +1780,7 @@
       </div>
       <div class="blocs-zone">
         ${blocs}
-        <button type="button" class="btn-action bloc-add" onclick="addBloc()">➕ Ajouter un bloc</button>
+        <button type="button" class="btn-action bloc-add" onclick="addBloc()">➕ Ajouter un lot</button>
       </div>`;
   }
 
@@ -1807,7 +1809,7 @@
     if (k === 1 || !blocKeys.includes(k)) return;
     const txt = (id) => { const el = document.getElementById(blocId(id, k)); return el ? htmlToPlainText(getFieldRawValue(el)).trim() : ''; };
     const hasContent = val(blocId('in-config', k)) > 0 || txt('in-detail') || txt('in-ateliers-detail');
-    if (hasContent && !confirm('Supprimer ce bloc et son contenu ?')) return;
+    if (hasContent && !confirm('Supprimer ce lot et son contenu ?')) return;
     rebuildNormalBody(st => {
       blocKeys = blocKeys.filter(x => x !== k);
       const suffix = blocSuffix(k);
@@ -1848,7 +1850,7 @@
         <span class="tbl-unit">j</span>
       </div>
       <div class="tbl-row tbl-row-split">
-        <div><div class="tbl-name">Développement</div></div>
+        <div><div class="tbl-name">Développements</div></div>
         <input type="number" class="tbl-input-root" id="in-dev" value="0" min="0" step="0.5" oninput="update()">
         <span class="tbl-unit">j</span>
         <input type="number" class="tbl-input-root" id="in-dev-tma" value="0" min="0" step="0.5" oninput="update()">
@@ -1870,7 +1872,7 @@
 
       <div class="tbl-row tbl-row-split">
         <div>
-          <div class="tbl-name">Recette et ajustement</div>
+          <div class="tbl-name">Recette et ajustements</div>
           <div class="tbl-desc"><strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement</div>
         </div>
         <input type="number" class="tbl-input-root" id="v-recette-f" value="0" min="0" step="0.5" oninput="markTouched('v-recette-f'); update();">
@@ -1925,8 +1927,8 @@
 
       <div class="tbl-row tbl-row-split tbl-row-coltotal">
         <div class="total-row-label">Total</div>
-        <span class="tbl-value" id="v-total-forfait-col">—</span><span class="tbl-unit">j</span>
-        <span class="tbl-value" id="v-total-tma-col">—</span><span class="tbl-unit">j</span>
+        <span class="tbl-value" id="v-total-forfait-col"></span><span class="tbl-unit">j</span>
+        <span class="tbl-value" id="v-total-tma-col"></span><span class="tbl-unit">j</span>
       </div>
 
     ` },
@@ -1937,7 +1939,7 @@
           <div class="tbl-name">Gestion de projet</div>
           <div class="tbl-desc">1 kick-off et suivi</div>
         </div>
-        <span class="tbl-value" id="v-gestion-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+        <span class="tbl-value" id="v-gestion-pc"></span><span class="tbl-unit tbl-unit-hide">j</span>
       </div>
 
       <div class="tbl-row">
@@ -1945,7 +1947,7 @@
           <div class="tbl-name">Atelier spécifications</div>
           <div class="tbl-desc">cadrage du besoin client ; atelier de 2h</div>
         </div>
-        <span class="tbl-value" id="v-atelier-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+        <span class="tbl-value" id="v-atelier-pc"></span><span class="tbl-unit tbl-unit-hide">j</span>
       </div>
 
       <div class="tbl-row">
@@ -1953,7 +1955,7 @@
           <div class="tbl-name">Paramétrage</div>
           <div class="tbl-desc">Environnement cloud, installation préconfigurée, configuration, DEX.</div>
         </div>
-        <span class="tbl-value" id="v-param-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+        <span class="tbl-value" id="v-param-pc"></span><span class="tbl-unit tbl-unit-hide">j</span>
       </div>
 
       <div class="tbl-row">
@@ -1961,7 +1963,7 @@
           <div class="tbl-name">Recette</div>
           <div class="tbl-desc">validation et ajustements client</div>
         </div>
-        <span class="tbl-value" id="v-recette-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+        <span class="tbl-value" id="v-recette-pc"></span><span class="tbl-unit tbl-unit-hide">j</span>
       </div>
 
       <div class="tbl-row">
@@ -1969,7 +1971,7 @@
           <div class="tbl-name" id="n-connecteurs-pc">Connecteurs</div>
           <div class="tbl-desc" id="d-connecteurs-pc"></div>
         </div>
-        <span class="tbl-value" id="v-connecteurs-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+        <span class="tbl-value" id="v-connecteurs-pc"></span><span class="tbl-unit tbl-unit-hide">j</span>
       </div>
 
       <div class="tbl-row">
@@ -1977,7 +1979,7 @@
           <div class="tbl-name">VSR</div>
           <div class="tbl-desc">non inclus</div>
         </div>
-        <span class="tbl-value zero" id="v-vsr-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+        <span class="tbl-value zero" id="v-vsr-pc"></span><span class="tbl-unit tbl-unit-hide">j</span>
       </div>
 
       <div class="tbl-row">
@@ -1985,7 +1987,7 @@
           <div class="tbl-name">Formation <span class="tbl-option-tag">(option)</span></div>
           <div class="tbl-desc" id="d-formation-pc"></div>
         </div>
-        <span class="tbl-value" id="v-formation-pc">—</span><span class="tbl-unit tbl-unit-hide">j</span>
+        <span class="tbl-value" id="v-formation-pc"></span><span class="tbl-unit tbl-unit-hide">j</span>
       </div>
     ` }
   };
@@ -2104,7 +2106,7 @@
       return { k, nb, nom, specDays: nb > 0 ? roundUp(0.5 * (nb + 1)) : 0 };
     });
     const baseEl = document.getElementById('d-detail-base');
-    if (baseEl) baseEl.textContent = 'Ateliers et paramétrage' + (multiBlocs ? ', par bloc' : '') + ' — base de calcul (gestion, recette, doc, VSR) : ' + fmtNum(p) + ' j de paramétrage';
+    if (baseEl) baseEl.textContent = 'Ateliers et paramétrages' + (multiBlocs ? ' par lot' : '') + ', base de calcul (gestion, recette, doc, VSR) : ' + fmtNum(p) + ' j de paramétrage';
 
     const dMep = document.getElementById('d-mep');
     if (!dMep.querySelector('#in-env')) {
@@ -2188,8 +2190,9 @@
       const atDesc = b.nb > 0
         ? '<strong>Inclus :</strong> ' + b.nb + ' atelier' + (b.nb > 1 ? 's' : '') + ' de 2h + 1 atelier de validation (0,5 j par atelier supplémentaire)'
         : '0,5 j par atelier demandé';
+      // (0 atelier : pas d'atelier de validation non plus)
       const at = { label: 'Ateliers', desc: atDesc + (atDetail ? '<br><span style="font-style:italic;">' + atDetail + '</span>' : ''), forfait: val(blocId('v-spec-f', b.k)), tma: val(blocId('v-spec-t', b.k)) };
-      const pa = { label: 'Paramétrage', desc: paDetail ? '<span style="font-style:italic;">' + paDetail + '</span>' : '', forfait: val(blocId('in-config', b.k)), tma: val(blocId('in-config-tma', b.k)) };
+      const pa = { label: 'Paramétrages', desc: paDetail ? '<span style="font-style:italic;">' + paDetail + '</span>' : '', forfait: val(blocId('in-config', b.k)), tma: val(blocId('in-config-tma', b.k)) };
       if (multiBlocs) {
         blocItems.push({ isLotHeader: true, label: escapeHtml(b.nom), forfait: at.forfait + pa.forfait, tma: at.tma + pa.tma });
         blocItems.push(Object.assign(at, { sub: true }), Object.assign(pa, { sub: true, lotEnd: true }));
@@ -2202,9 +2205,9 @@
       { label: 'Gestion de projet', desc: '<strong>Forfait :</strong> kick-off, point interne, mail<br><strong>TMA :</strong> Comitologie client (coproj, copil, etc.)', forfait: gestionForfaitFinal, tma: gestionTMAFinal },
       ...blocItems,
       { label: 'Installation', desc: '', forfait: installF, tma: installT },
-      { label: 'Développement', desc: '', forfait: devF, tma: devT },
+      { label: 'Développements', desc: '', forfait: devF, tma: devT },
       { label: 'Connecteurs', desc: connDetail, forfait: connForfait, tma: connTMA },
-      { label: 'Recette et ajustement', desc: '<strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement', forfait: recetteForfaitFinal, tma: recetteTMAFinal },
+      { label: 'Recette et ajustements', desc: '<strong>Forfait :</strong> recette interne, présentation Key Users, traitement des bugs remontés<br><strong>TMA :</strong> accompagnement et ajustement', forfait: recetteForfaitFinal, tma: recetteTMAFinal },
       { label: 'Mise en production', desc: nbEnv > 0 ? nbEnv + ' environnement' + (nbEnv > 1 ? 's' : '') : '', forfait: mepDaysFinal, tma: mepTMA },
       { label: 'Documentation', desc: 'DEX, DAT, passation support', forfait: docDaysFinal, tma: docTMA },
       { label: 'VSR', desc: 'accompagnement et correction post-livraison', forfait: vsrForfait, tma: vsrDaysFinal },
@@ -2370,8 +2373,8 @@
         rows += `
         <tr>
           <td style="padding:7px 12px 3px 0;color:#1a6abf;font-weight:bold;letter-spacing:0.02em;">${it.label}</td>
-          <td style="padding:7px 0 3px;color:#1a6abf;font-weight:bold;text-align:right;white-space:nowrap;">${it.forfait > 0 ? fmt(it.forfait) : '—'}</td>
-          <td style="padding:7px 0 3px 12px;color:#555;font-weight:bold;text-align:right;white-space:nowrap;">${it.tma > 0 ? fmt(it.tma) : '—'}</td>
+          <td style="padding:7px 0 3px;color:#1a6abf;font-weight:bold;text-align:right;white-space:nowrap;">${it.forfait > 0 ? fmt(it.forfait) : ''}</td>
+          <td style="padding:7px 0 3px 12px;color:#555;font-weight:bold;text-align:right;white-space:nowrap;">${it.tma > 0 ? fmt(it.tma) : ''}</td>
         </tr>`;
         return;
       }
@@ -2396,10 +2399,10 @@
             ${it.desc ? '<br><span style="' + descStyle + '">' + it.desc + '</span>' : ''}
           </td>
           <td style="padding:5px 0;color:#1a6abf;font-weight:bold;text-align:right;border-bottom:1px solid #eee;white-space:nowrap;">
-            ${it.forfait > 0 ? fmt(it.forfait) : '—'}
+            ${it.forfait > 0 ? fmt(it.forfait) : ''}
           </td>
           <td style="padding:5px 0 5px 12px;color:#555;font-weight:bold;text-align:right;border-bottom:1px solid #eee;white-space:nowrap;">
-            ${it.tma > 0 ? fmt(it.tma) : '—'}
+            ${it.tma > 0 ? fmt(it.tma) : ''}
           </td>
         </tr>`;
     });
@@ -2846,7 +2849,7 @@
       return true;
     } catch (e) {
       fileHandle = null;
-      setFileStatus('« ' + csvFileName + ' » introuvable dans le dossier « ' + dirHandle.name + ' » — clique "Choisir le dossier partagé…".');
+      setFileStatus('« ' + csvFileName + ' » introuvable dans le dossier « ' + dirHandle.name + ' ». Clique "Choisir le dossier partagé…".');
       return false;
     }
   }
@@ -2877,7 +2880,7 @@
     if (!fileHandle) return;
     const already = (await fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
     if (!already) {
-      setFileStatus('Fichier "' + fileHandle.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
+      setFileStatus('Fichier "' + fileHandle.name + '" mémorisé : clique sur "Reconnecter" pour redonner l’accès.');
       document.getElementById('btn-reconnect-file').classList.remove('hidden');
       return;
     }
@@ -2887,7 +2890,7 @@
       const fileRows = text.trim() ? rowsFromCSVText(text) : [];
       demandes = buildMergedForSave(fileRows);
       persistLocal();
-      setFileStatus('Chargé depuis ' + fileHandle.name + ' — ' + demandes.length + ' demande(s).');
+      setFileStatus('Chargé depuis ' + fileHandle.name + ' : ' + demandes.length + ' demande(s).');
       renderDemandesTable();
       await refreshInboxCount();
     } catch (e) {
@@ -2919,7 +2922,7 @@
         dirtyDemandeIds.clear();
         deletedDemandeIds.clear();
         persistLocal();
-        setFileStatus('Enregistré dans ' + fileHandle.name + ' — ' + new Date().toLocaleTimeString('fr-FR'));
+        setFileStatus('Enregistré dans ' + fileHandle.name + ' à ' + new Date().toLocaleTimeString('fr-FR'));
         await writeHistoryFile(merged);
         renderDemandesTable();
         return true;
@@ -2929,9 +2932,9 @@
         showToast('Échec de l’enregistrement dans le fichier partagé (' + e.message + '). Tes changements restent en local.', 'error');
       }
     } else if (!fileApiSupported) {
-      setFileStatus('Non sauvegardé sur disque — pense à cliquer "Télécharger CSV" pour publier tes changements.');
+      setFileStatus('Non sauvegardé sur disque : pense à cliquer "Télécharger CSV" pour publier tes changements.');
     } else {
-      setFileStatus('Aucun dossier connecté — clique "Choisir le dossier partagé…" pour commencer à sauvegarder.');
+      setFileStatus('Aucun dossier connecté : clique "Choisir le dossier partagé…" pour commencer à sauvegarder.');
     }
     renderDemandesTable();
     return false;
@@ -2955,7 +2958,7 @@
       const fileRows = reader.result.trim() ? rowsFromCSVText(reader.result) : [];
       demandes = buildMergedForSave(fileRows); // protège nos éventuelles modifs locales pas encore exportées
       persistLocal();
-      setFileStatus('CSV importé (' + file.name + ') — pense à re-télécharger après tes changements.');
+      setFileStatus('CSV importé (' + file.name + '). Pense à re-télécharger après tes changements.');
       renderDemandesTable();
     };
     reader.readAsText(file, 'utf-8');
@@ -2972,7 +2975,7 @@
     dirtyDemandeIds.clear();
     deletedDemandeIds.clear();
     persistLocal();
-    setFileStatus('CSV téléchargé — dépose-le dans le dossier partagé pour que l’équipe le voie.');
+    setFileStatus('CSV téléchargé : dépose-le dans le dossier partagé pour que l’équipe le voie.');
   }
 
   // ── Notifications non bloquantes (remplacent les alert() du navigateur) ──
@@ -3081,7 +3084,7 @@
   // Cellule de tableau : nombre seul (les anciennes valeurs stockées "6 jours" / "6 j" sont
   // normalisées à l'affichage) ; l'unité n'apparaît que sur les lignes Total.
   function fmtCell(v) {
-    return v === undefined || v === null || String(v).trim() === '' ? '—' : fmtNum(parseTotalNum(v));
+    return v === undefined || v === null || String(v).trim() === '' ? '' : fmtNum(parseTotalNum(v));
   }
   function sortValue(d, col) {
     switch (col) {
@@ -3177,7 +3180,7 @@
     const commentPlain = d.commentaire ? htmlToPlainText(d.commentaire).trim() : '';
     const commentTxt = commentPlain ? `<span class="comment-flag" title="${escapeHtml(commentPlain)}">💬</span>` : '';
     const iaFlag = d.ia_source
-      ? `<span class="ia-flag" title="${escapeHtml('Pré-rempli par l’IA' + (d.ia_justification ? ' — ' + d.ia_justification : ''))}">🤖</span>`
+      ? `<span class="ia-flag" title="${escapeHtml('Pré-rempli par l’IA' + (d.ia_justification ? ' : ' + d.ia_justification : ''))}">🤖</span>`
       : '';
     return `
           <td>${escapeHtml(d.client || '')}</td>
@@ -3304,7 +3307,7 @@
   // Différence vendu - passé, affichée en vert/rouge selon le signe. "—" tant qu'il n'y a
   // ni vendu ni passé (rien à comparer), "0" si les deux se valent exactement.
   function diffCellHtml(vendu, passe) {
-    if (!vendu && !passe) return '<span class="tbl-value na">—</span>';
+    if (!vendu && !passe) return '';
     const diff = parseTotalNum(vendu) - parseTotalNum(passe);
     const cls = diff < 0 ? 'diff-neg' : (diff > 0 ? 'diff-pos' : '');
     const sign = diff > 0 ? '+' : '';
@@ -3326,7 +3329,7 @@
       <tr ondblclick="if (!event.target.closest('input')) openDemande('${d.id}')">
         <td>${escapeHtml(d.client || '')}</td>
         <td class="demande-cell" title="${escapeHtml(d.demande || '')}">${escapeHtml(d.titre || truncateText(d.demande || '', 60) || '(sans titre)')}</td>
-        <td><input type="text" class="inline-cell-input inline-cell-text" value="${escapeHtml(d.numero_commande || '')}" placeholder="—" onchange="onCommandeFieldChange('${d.id}','numero_commande',this.value)"></td>
+        <td><input type="text" class="inline-cell-input inline-cell-text" value="${escapeHtml(d.numero_commande || '')}" placeholder="" onchange="onCommandeFieldChange('${d.id}','numero_commande',this.value)"></td>
         <td>${fmtCell(d.total_forfait)}</td>
         <td>${fmtCell(d.total_tma)}</td>
         <td><input type="number" class="inline-cell-input" min="0" step="0.5" value="${escapeHtml(d.temps_passe_forfait || '')}" placeholder="0" onchange="onCommandeFieldChange('${d.id}','temps_passe_forfait',this.value)"></td>
@@ -3642,7 +3645,7 @@
       id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       client: str(r.client) || '(client à préciser)',
       titre: str(r.titre) || truncateText(demandeText, 60),
-      demande: demandeText + (contexte.length ? '\n\n' + contexte.join(' — ') : ''),
+      demande: demandeText + (contexte.length ? '\n\n' + contexte.join(', ') : ''),
       demandeur: str(r.demandeur),
       jira: str(r.jira),
       statut: STATUTS[0],
@@ -3672,7 +3675,7 @@
     if (dirHandle && fileHandle) {
       try { n = (await listInboxFiles()).files.length; } catch (e) { console.error('boîte d’arrivée IA', e); }
     }
-    btn.textContent = '🤖 ' + n + ' chiffrage' + (n > 1 ? 's' : '') + ' en attente d’import — Importer';
+    btn.textContent = '🤖 ' + n + ' chiffrage' + (n > 1 ? 's' : '') + ' en attente d’import : importer';
     btn.classList.toggle('hidden', n === 0);
     return n;
   }
@@ -3739,7 +3742,7 @@
     const out = [
       '# Historique des chiffrages DocuWare',
       '',
-      'Généré automatiquement par l’outil de chiffrage le ' + new Date().toLocaleString('fr-FR') + ' — ' + list.length + ' chiffrage(s).',
+      'Généré automatiquement par l’outil de chiffrage le ' + new Date().toLocaleString('fr-FR') + ', ' + list.length + ' chiffrage(s).',
       'Jours en jours-homme. « Jours saisis » = postes estimés (paramétrage, installation, développement, connecteurs) ;',
       'gestion de projet, spécifications/ateliers, recette, mise en production, documentation et VSR sont calculés',
       'par l’outil à partir du paramétrage et inclus dans les totaux. Le statut « Validé » signifie que le client a commandé.',
@@ -3750,8 +3753,8 @@
       try { f = (JSON.parse(d.etat_json || '{}').fields) || {}; } catch (e) { f = {}; }
       const isProjet = d.type === 'normal';
       const n = (id) => fmtNum(parseTotalNum(f[id]));
-      out.push('## ' + mdText(d.client) + ' — ' + mdText(d.titre), '');
-      out.push('- Statut : ' + (d.statut || '—'));
+      out.push('## ' + mdText(d.client) + ' : ' + mdText(d.titre), '');
+      out.push('- Statut : ' + (d.statut || 'non renseigné'));
       out.push('- Type : ' + (isProjet ? 'Projet' : 'Préconf (forfait fixe)'));
       if (d.date_creation) out.push('- Date de la demande : ' + d.date_creation.slice(0, 10));
       if (d.demandeur) out.push('- Demandeur : ' + mdText(d.demandeur));
@@ -3765,15 +3768,15 @@
         const parBloc = multi ? ' (' + keys.map((k, i) => nomBloc(k, i) + ' ' + n(blocId('in-config', k))).join(' · ') + ')' : '';
         out.push('- Jours saisis : paramétrage ' + fmtNum(totalParam) + parBloc + ' · installation ' + n('in-install') + ' · développement ' + n('in-dev') + ' · connecteurs ' + n('in-connecteurs-f'));
         const at = keys.map((k, i) => f[blocId('in-ateliers', k)] ? (multi ? nomBloc(k, i) + ' ' : '') + f[blocId('in-ateliers', k)] : '').filter(Boolean);
-        if (at.length) out.push('- Ateliers : ' + at.join(' · ') + ' (+ 1 atelier de validation' + (multi ? ' par bloc' : '') + ')');
+        if (at.length) out.push('- Ateliers : ' + at.join(' · ') + ' (+ 1 atelier de validation' + (multi ? ' par lot' : '') + ')');
       }
       out.push('- Total : ' + fmtCell(d.total_forfait) + ' j au forfait' + (d.total_tma ? ' + ' + fmtCell(d.total_tma) + ' j en TMA' : ''));
       const demande = mdText(d.demande).replace(/\n{2,}/g, '\n'); // texte brut (pas du HTML)
       if (demande) out.push('', '**Demande** : ' + demande.replace(/\n/g, '  \n'));
       const sections = [];
       (isProjet ? keys : [1]).forEach((k, i) => {
-        const suffix = multi ? ' — ' + nomBloc(k, i) : '';
-        sections.push([blocId('in-ateliers-detail', k), 'Ateliers' + suffix], [blocId('in-detail', k), 'Détail du paramétrage' + suffix]);
+        const suffix = multi ? ' (' + nomBloc(k, i) + ')' : '';
+        sections.push([blocId('in-ateliers-detail', k), 'Ateliers' + suffix], [blocId('in-detail', k), 'Paramétrages' + suffix]);
       });
       sections.push(['in-connecteurs-detail', 'Connecteurs']);
       sections.forEach(([id, label]) => {
@@ -3868,8 +3871,8 @@
   }
   // Dates et lien Jira (seules parties non saisies de la carte).
   function refreshCardMeta(d) {
-    document.getElementById('dc-date-creation').textContent = formatDateOnlyFr(d.date_creation) || '—';
-    document.getElementById('dc-date-maj').textContent = formatDateFr(d.date_maj) || '—';
+    document.getElementById('dc-date-creation').textContent = formatDateOnlyFr(d.date_creation) || '';
+    document.getElementById('dc-date-maj').textContent = formatDateFr(d.date_maj) || '';
     const link = document.getElementById('dc-jira-link');
     link.classList.toggle('hidden', !d.jira);
     if (d.jira) link.href = jiraUrl(d.jira);
@@ -3914,18 +3917,18 @@
   // Lignes d'aperçu pour un bloc : ancien bloc ok (ou undefined si nouveau) → valeurs prévues set (bloc nk).
   function blocDiffLines(oldF, ok, set, nk, label) {
     const out = [];
-    const lbl = (base) => base + (label ? ' — ' + escapeHtml(label) : '');
+    const lbl = (base) => base + (label ? ' (' + escapeHtml(label) + ')' : '');
     const has = (b) => set[blocId(b, nk)] !== undefined;
     const oldVal = (b) => ok === undefined ? undefined : oldF[blocId(b, ok)];
     if (has('in-config')) {
       const a = parseTotalNum(oldVal('in-config')), b = parseTotalNum(set[blocId('in-config', nk)]);
-      if (a !== b || ok === undefined) out.push(`<li><b>${lbl('Paramétrage')}</b> : ${ok === undefined ? 'nouveau bloc, ' : fmtNum(a) + ' j → '}<b>${fmtNum(b)} j</b></li>`);
+      if (a !== b || ok === undefined) out.push(`<li><b>${lbl('Paramétrages')}</b> : ${ok === undefined ? 'nouveau lot, ' : fmtNum(a) + ' j → '}<b>${fmtNum(b)} j</b></li>`);
     }
     if (has('in-ateliers')) {
       const a = oldVal('in-ateliers') !== undefined ? parseInt(oldVal('in-ateliers'), 10) : null, b = parseInt(set[blocId('in-ateliers', nk)], 10);
       if (a !== b) out.push(`<li><b>${lbl('Ateliers')}</b> : ${ok === undefined ? '' : (a === null ? 'par défaut' : a) + ' → '}<b>${b}</b></li>`);
     }
-    [['in-detail', 'Détail paramétrage'], ['in-ateliers-detail', 'Liste des ateliers']].forEach(([b, name]) => {
+    [['in-detail', 'Détail des paramétrages'], ['in-ateliers-detail', 'Liste des ateliers']].forEach(([b, name]) => {
       if (!has(b)) return;
       const a = htmlToPlainText(oldVal(b) || '').trim(), v = htmlToPlainText(set[blocId(b, nk)] || '').trim();
       if (a !== v && (ok !== undefined || v)) out.push(`<li><b>${lbl(name)}</b> : ${v ? (a ? 'modifié' : 'ajouté') : 'vidé'}</li>`);
@@ -3970,7 +3973,7 @@
     const { st, fields: f } = stateFields(d);
     const keys = Array.isArray(st.blocs) && st.blocs.length ? st.blocs.map(Number) : [1];
     const isProjet = d.type === 'normal';
-    const heb = (String(d.demande || '').match(/Hébergement : ([^—\n]+)/) || [])[1] || '';
+    const heb = (String(d.demande || '').match(/Hébergement : ([^—,\n]+)/) || [])[1] || '';
     const description = String(d.demande || '').replace(/\n*Hébergement : [^\n]*$/, '').trim();
     const num = (id) => parseTotalNum(f[id]);
     return {
@@ -4010,7 +4013,7 @@
       '- Garde ce qui reste valable ; ne modifie que ce que les nouvelles informations justifient.',
       '- Dans "justification", explique ce qui change par rapport à la version actuelle et pourquoi.',
       '',
-      'Chiffrage actuel (total actuel : ' + (fmtCell(d.total_forfait) || '—') + ' j au forfait, ' + (fmtCell(d.total_tma) || '—') + ' j en TMA) :',
+      'Chiffrage actuel (total actuel : ' + (fmtCell(d.total_forfait) || '0') + ' j au forfait, ' + (fmtCell(d.total_tma) || '0') + ' j en TMA) :',
       '```json',
       JSON.stringify(currentDemandeAsAiJson(d), null, 2),
       '```',
@@ -4096,10 +4099,10 @@
           }
           const label = multi ? (newF[blocId('bloc-nom', nk)] || defaultBlocName(i)) : '';
           const renamed = ok !== undefined && multi && oldKeys.length > 1 && oldNames[i] !== label;
-          if (renamed) lines.push(`<li><b>Bloc renommé</b> : ${escapeHtml(oldNames[i])} → <b>${escapeHtml(label)}</b></li>`);
+          if (renamed) lines.push(`<li><b>Lot renommé</b> : ${escapeHtml(oldNames[i])} → <b>${escapeHtml(label)}</b></li>`);
           lines.push(...blocDiffLines(oldF, ok, set, nk, label));
         });
-        oldKeys.slice(newKeys.length).forEach((ok, j) => lines.push(`<li><b>Bloc supprimé</b> : ${escapeHtml(oldNames[newKeys.length + j] || 'bloc ' + (newKeys.length + j + 1))}</li>`));
+        oldKeys.slice(newKeys.length).forEach((ok, j) => lines.push(`<li><b>Lot supprimé</b> : ${escapeHtml(oldNames[newKeys.length + j] || 'lot ' + (newKeys.length + j + 1))}</li>`));
         blocPlan = { keys: newKeys, set, remove, remap, touched };
       } else if (flatKeys.length) {
         const set = {}, touched = [];
@@ -4196,7 +4199,7 @@
     if (nd.demande) d.demande = nd.demande;
     if (nd.commentaire) d.commentaire = (d.commentaire ? d.commentaire + '<br>' : '') + nd.commentaire;
     if (nd.ia_justification) {
-      const header = 'Réimport du ' + now.toLocaleDateString('fr-FR') + ' — Justification de l’IA : ' + nd.ia_justification;
+      const header = 'Réimport du ' + now.toLocaleDateString('fr-FR') + ', justification de l’IA : ' + nd.ia_justification;
       d.notes_internes = (d.notes_internes ? d.notes_internes.trimEnd() + '\n\n' : '') + header;
       d.ia_justification = nd.ia_justification;
     }
@@ -4209,7 +4212,7 @@
     syncCurrentDemandeFromCalculator(); // totaux et mail à jour
     commitLocal();
     publishIfConnected();
-    showToast(mode === 'version' ? 'Réimport fait — l’ancienne version est gardée au statut « Archivé ».' : 'Réimport fait.', 'info');
+    showToast(mode === 'version' ? 'Réimport fait : l’ancienne version est gardée au statut « Archivé ».' : 'Réimport fait.', 'info');
   }
 
   // ── Notes internes (jamais reprises dans le mail ni dans Jira) ──
@@ -4423,7 +4426,7 @@
           await loadFromFileHandle();
         }
       } else {
-        setFileStatus('Dossier "' + dir.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
+        setFileStatus('Dossier "' + dir.name + '" mémorisé : clique sur "Reconnecter" pour redonner l’accès.');
         document.getElementById('btn-reconnect-file').classList.remove('hidden');
         showToast('Fichier partagé à reconnecter : ⚙️ Paramétrage → Reconnecter.', 'warn');
       }
@@ -4431,16 +4434,16 @@
     }
     const handle = await idbLoad('csv'); // ancien mode : fichier seul, sans boîte d'arrivée IA
     if (!handle) {
-      setFileStatus('Travail local (' + demandes.length + ' demande(s)) — clique "Choisir le dossier partagé…" (celui qui contient le CSV).');
+      setFileStatus('Travail local (' + demandes.length + ' demande(s)). Clique "Choisir le dossier partagé…" (celui qui contient le CSV).');
       return;
     }
     fileHandle = handle;
     updateFileButtons();
     const already = (await handle.queryPermission({ mode: 'readwrite' })) === 'granted';
     if (already) {
-      setFileStatus('Fichier "' + handle.name + '" connecté — pour activer l’import IA, clique "Choisir le dossier partagé…" (le dossier qui contient ce fichier).');
+      setFileStatus('Fichier "' + handle.name + '" connecté. Pour activer l’import IA, clique "Choisir le dossier partagé…" (le dossier qui contient ce fichier).');
     } else {
-      setFileStatus('Fichier "' + handle.name + '" mémorisé — clique sur "Reconnecter" pour redonner l’accès.');
+      setFileStatus('Fichier "' + handle.name + '" mémorisé : clique sur "Reconnecter" pour redonner l’accès.');
       document.getElementById('btn-reconnect-file').classList.remove('hidden');
     }
   })();
