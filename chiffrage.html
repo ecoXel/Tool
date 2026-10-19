@@ -2179,19 +2179,19 @@
     const mepTMA = val('v-mep-t'), docTMA = val('v-doc-t');
     const vsrForfait = val('v-vsr-f'), formForfait = val('v-formation-f');
     // Une paire de lignes (Ateliers, Paramétrage) par bloc. Avec plusieurs blocs : une ligne
-    // d'en-tête par lot ("LOT nom", avec le total du lot, exclue des totaux généraux), puis ses
+    // d'en-tête par lot (nom du lot, avec le total du lot, exclue des totaux généraux), puis ses
     // deux lignes, sans séparation entre elles.
     const blocItems = [];
     blocs.forEach(b => {
       const atDetail = richMailValue(blocId('in-ateliers-detail', b.k));
       const paDetail = paramDetail(b.k);
       const atDesc = b.nb > 0
-        ? '<strong>Forfait :</strong> ' + b.nb + ' atelier' + (b.nb > 1 ? 's' : '') + ' de 2h + 1 atelier de validation inclus<br><strong>TMA :</strong> 0,5 j par atelier supplémentaire demandé'
-        : '<strong>TMA :</strong> 0,5 j par atelier demandé';
+        ? '<strong>Inclus :</strong> ' + b.nb + ' atelier' + (b.nb > 1 ? 's' : '') + ' de 2h + 1 atelier de validation (0,5 j par atelier supplémentaire)'
+        : '0,5 j par atelier demandé';
       const at = { label: 'Ateliers', desc: atDesc + (atDetail ? '<br><span style="font-style:italic;">' + atDetail + '</span>' : ''), forfait: val(blocId('v-spec-f', b.k)), tma: val(blocId('v-spec-t', b.k)) };
       const pa = { label: 'Paramétrage', desc: paDetail ? '<span style="font-style:italic;">' + paDetail + '</span>' : '', forfait: val(blocId('in-config', b.k)), tma: val(blocId('in-config-tma', b.k)) };
       if (multiBlocs) {
-        blocItems.push({ isLotHeader: true, label: 'LOT ' + escapeHtml(b.nom.replace(/^lot\s*/i, '')), forfait: at.forfait + pa.forfait, tma: at.tma + pa.tma });
+        blocItems.push({ isLotHeader: true, label: escapeHtml(b.nom), forfait: at.forfait + pa.forfait, tma: at.tma + pa.tma });
         blocItems.push(Object.assign(at, { sub: true }), Object.assign(pa, { sub: true, lotEnd: true }));
       } else {
         blocItems.push(at, pa);
