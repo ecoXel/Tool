@@ -1195,7 +1195,7 @@
         <span class="type-badge" id="type-badge"></span>
       </div>
       <div class="right-actions" id="right-actions" style="display:none">
-        <button class="btn-action" id="btn-mail-toggle" onclick="toggleMail()">Afficher l'aperçu mail</button>
+        <button class="btn-action" id="btn-mail-toggle" onclick="toggleMail()">Afficher l'aperçu</button>
       </div>
     </div>
 
@@ -1235,14 +1235,14 @@
       </div>
 
       <div class="mail-toggle-bottom">
-        <button class="btn-action" id="btn-mail-toggle-bottom" onclick="toggleMail(true)">Afficher l'aperçu mail</button>
+        <button class="btn-action" id="btn-mail-toggle-bottom" onclick="toggleMail(true)">Afficher l'aperçu</button>
       </div>
 
       <div id="mail-block" class="hidden">
         <hr class="mail-divider">
         <div class="mail-preview">
           <div class="mail-preview-label">
-            <span>Aperçu mail : copiable dans Outlook</span>
+            <span>Aperçu</span>
             <button class="btn-action" id="btn-copy" onclick="copyMail()">Copier mail</button>
             <button class="btn-action" id="btn-copy-jira" onclick="copyForJira()">Copier pour Jira</button>
             <button class="btn-action" id="btn-copy-table" onclick="copyTable()">Copier tableau</button>
@@ -1683,7 +1683,7 @@
     ['btn-mail-toggle', 'btn-mail-toggle-bottom'].forEach(id => {
       const btn = document.getElementById(id);
       if (!btn) return;
-      btn.textContent = showing ? "Masquer l'aperçu mail" : "Afficher l'aperçu mail";
+      btn.textContent = showing ? "Masquer l'aperçu" : "Afficher l'aperçu";
       btn.classList.toggle('active-toggle', showing);
     });
   }
@@ -2376,8 +2376,7 @@
     const totalGrand = totalForfait + totalTMA;
 
     const html = `
-      <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
-        Bonjour,<br><br>
+      <p data-part="intro" style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
         ${mailIntroLead()} <b>${fmtJour(totalGrand)}</b> (dont <b>${fmtJour(totalForfait)}</b> au forfait, et <b>${fmtJour(totalTMA)}</b> en TMA).
       </p>
       <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
@@ -2401,18 +2400,15 @@
             <td style="padding:4px 0 4px 12px;color:#555;font-weight:bold;text-align:right;">${fmt(totalTMA)}</td>
           </tr>
           <tr>
+            <td colspan="3" style="padding:0 0 6px;color:#888;font-size:11px;font-style:italic;">* TMA : enveloppe prévisionnelle, consommée au réel ; si insuffisante, une commande supplémentaire pourra être demandée en cours de projet.</td>
+          </tr>
+          <tr>
             <td style="padding:6px 12px 8px 0;color:#222;font-weight:bold;border-top:1px solid #1a6abf;">Total</td>
             <td colspan="2" style="padding:6px 0 8px;color:#1a6abf;font-weight:bold;text-align:right;border-top:1px solid #1a6abf;">${fmt(totalGrand)}</td>
           </tr>
         </tbody>
       </table>
-      <p style="margin:10px 0 0;color:#888;font-family:Arial,sans-serif;font-size:11px;font-style:italic;">
-        * TMA : enveloppe prévisionnelle, consommée au réel ; si insuffisante, une commande supplémentaire pourra être demandée en cours de projet.
-      </p>
-      ${mailCommentBlock()}
-      <p style="margin:16px 0 0;color:#555;font-family:Arial,sans-serif;font-size:13px;">
-        Je reste disponible si vous avez besoin de détails complémentaires.
-      </p>`;
+      ${mailCommentBlock()}`;
 
     document.getElementById('mail-render').innerHTML = html;
   }
@@ -2471,8 +2467,7 @@
 
 
     const html = `
-      <p style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
-        Bonjour,<br><br>
+      <p data-part="intro" style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;">
         ${mailIntroLead()} ${introTotal}.
       </p>
       <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;">
@@ -2481,10 +2476,7 @@
           ${totalRowHtml}
         </tbody>
       </table>
-      ${mailCommentBlock()}
-      <p style="margin:16px 0 0;color:#555;font-family:Arial,sans-serif;font-size:13px;">
-        Je reste disponible si vous avez besoin de détails complémentaires.
-      </p>`;
+      ${mailCommentBlock()}`;
 
     document.getElementById('mail-render').innerHTML = html;
   }
@@ -2504,16 +2496,21 @@
     commitLocal();
     publishIfConnected();
 
-    const blob = new Blob([mailEl.innerHTML], { type: 'text/html' });
-    const item = new ClipboardItem({ 'text/html': blob });
+    // L'aperçu ne montre que le contenu ; le mail copié reçoit la formule d'accueil et de fin.
+    const P = 'style="margin:0 0 12px;color:#222;font-family:Arial,sans-serif;font-size:13px;"';
+    const mailHtml = `<p ${P}>Bonjour,</p>` + mailEl.innerHTML
+      + '<p style="margin:16px 0 0;color:#555;font-family:Arial,sans-serif;font-size:13px;">Je reste disponible si vous avez besoin de détails complémentaires.</p>';
+    const tmp = document.createElement('div');
+    tmp.innerHTML = mailHtml;
+    const blob = new Blob([mailHtml], { type: 'text/html' });
+    const item = new ClipboardItem({ 'text/html': blob, 'text/plain': new Blob([tmp.innerText], { type: 'text/plain' }) });
     navigator.clipboard.write([item]).then(() => {
       const btn = document.getElementById('btn-copy');
       btn.textContent = 'Copié !';
       btn.classList.add('copied');
       setTimeout(() => { btn.textContent = 'Copier mail'; btn.classList.remove('copied'); }, 2000);
     }).catch(() => {
-      const text = mailEl.innerText;
-      navigator.clipboard.writeText(text).then(() => {
+      navigator.clipboard.writeText(tmp.innerText).then(() => {
         const btn = document.getElementById('btn-copy');
         btn.textContent = 'Copié (texte)';
         setTimeout(() => { btn.textContent = 'Copier mail'; }, 2000);
@@ -2521,7 +2518,7 @@
     });
   }
 
-  // ── Copier tableau : uniquement le tableau du chiffrage (sans intro, note TMA ni commentaire) ──
+  // ── Copier tableau : uniquement le tableau du chiffrage, note TMA comprise (sans intro ni commentaire) ──
   function copyTable() {
     const table = document.querySelector('#mail-render table');
     if (!table) return;
@@ -2536,10 +2533,9 @@
       .catch(() => navigator.clipboard.writeText(table.innerText).then(() => done('Copié (texte)')));
   }
 
-  // ── Copier pour Jira : demande initiale + tableau de chiffrage, sans la formule de politesse
-  // du mail (le "Bonjour" / "je reste disponible" n'a pas sa place dans un ticket). On repart du
-  // mail déjà construit (toujours à jour car reconstruit à chaque saisie) et on retire juste son
-  // premier et son dernier bloc, qui sont systématiquement la formule d'intro et la formule de fin. ──
+  // ── Copier pour Jira : demande initiale + tableau de chiffrage, sans la phrase d'intro du mail.
+  // On repart de l'aperçu (toujours à jour, sans formule de politesse) et on retire la phrase
+  // d'intro, repérée par data-part="intro". ──
   function copyForJira() {
     const mailEl = document.getElementById('mail-render');
     if (!mailEl.innerHTML || mailEl.innerHTML.trim() === '') return;
@@ -2549,8 +2545,8 @@
     publishIfConnected();
 
     const clone = mailEl.cloneNode(true);
-    if (clone.firstElementChild) clone.firstElementChild.remove(); // "Bonjour, ... le total est de ..."
-    if (clone.lastElementChild) clone.lastElementChild.remove(); // "Je reste disponible ..."
+    const intro = clone.querySelector('[data-part="intro"]');
+    if (intro) intro.remove(); // "Chiffrage pour le client …, le total est de …"
 
     const d = currentDemandeId ? demandes.find(x => x.id === currentDemandeId) : null;
     const demandeBlock = d && d.demande
