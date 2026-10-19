@@ -303,7 +303,18 @@
   .param-help { font-size: 12px; color: var(--text-dim); line-height: 1.6; margin-bottom: 12px; }
   .param-help code { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-mid); }
   .param-section .file-status-bar { margin-bottom: 0; }
-  .toast-zone { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; max-width: 380px; }
+  /* Bouton flottant "remonter en haut", visible dès qu'on a défilé ; les notifications s'affichent au-dessus. */
+  .btn-top {
+    position: fixed; right: 20px; bottom: 20px; z-index: 999;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--accent); color: var(--accent);
+    font-size: 18px; line-height: 1; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .btn-top.visible { opacity: 1; pointer-events: auto; }
+  .btn-top:hover { background: var(--accent-glow); }
+  .toast-zone { position: fixed; right: 20px; bottom: 72px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; max-width: 380px; }
   .toast {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -974,6 +985,7 @@
 <body>
 
 <div id="toast-zone" class="toast-zone"></div>
+<button type="button" id="btn-top" class="btn-top" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })" title="Remonter en haut de la page">↑</button>
 
 <div class="container">
 
@@ -1705,7 +1717,8 @@
       syncCurrentDemandeFromCalculator();
       commitLocal();
       publishIfConnected();
-      if (fromBottom) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Les deux boutons (haut et bas) amènent à l'aperçu.
+      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
@@ -3054,6 +3067,11 @@
     persistLocal();
     setFileStatus('CSV téléchargé : dépose-le dans le dossier partagé pour que l’équipe le voie.');
   }
+
+  window.addEventListener('scroll', () => {
+    const btn = document.getElementById('btn-top');
+    if (btn) btn.classList.toggle('visible', window.scrollY > 300);
+  }, { passive: true });
 
   // ── Notifications non bloquantes (remplacent les alert() du navigateur) ──
   function showToast(msg, kind) {
