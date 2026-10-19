@@ -199,7 +199,7 @@
   .new-demande-form textarea:focus { border-color: var(--accent); }
   .new-demande-form-actions { display: flex; gap: 8px; }
   .ia-flag { margin-left: 4px; font-size: 11px; cursor: help; }
-  .mail-toggle-bottom { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .mail-toggle-bottom { display: flex; justify-content: flex-end; padding: 14px 20px 18px; }
   /* ── Détail : blocs (lots de paramétrage) ── */
   .detail-head { border-bottom: none !important; padding-bottom: 6px; }
   .blocs-zone { margin-left: 10px; padding-left: 14px; border-left: 2px solid var(--accent-dim); display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
@@ -1746,7 +1746,7 @@
           <button type="button" class="bloc-tool" onclick="moveBloc(${k}, -1)" title="Monter ce lot"${i === 0 ? ' disabled' : ''}>↑</button>
           <button type="button" class="bloc-tool" onclick="moveBloc(${k}, 1)" title="Descendre ce lot"${i === blocKeys.length - 1 ? ' disabled' : ''}>↓</button>
           <button type="button" class="bloc-tool" onclick="duplicateBloc(${k})" title="Dupliquer ce lot">⧉</button>
-          <button type="button" class="bloc-remove" onclick="removeBloc(${k})" title="Supprimer ce lot">✕</button>
+          <button type="button" class="bloc-remove" onclick="removeBloc(${k})" title="Supprimer ce lot">🗑️</button>
         </div>` : '';
       return `
       <div class="bloc${multi ? '' : ' bloc-single'}">
